@@ -1,9 +1,6 @@
 const charTemp = 15; // Characteristic about temp
 
 const list = [
-    47, 
-    81, 
-    82, 
     4,
     9,
     10, 
@@ -26,6 +23,11 @@ function getSensorsList() {
 
 function reportAboutTemps() {
     let res = '';
+
+    // Because the list above is also used to send to the database and this will 
+    // interfere with the calculation of the average value at the database level. 
+    // But in the telegram report I’m interested in these sensors
+    list.unshift(47, 81, 82);
 
     list.forEach(function(item) {
         res = res + Hub.getCharacteristic(item, charTemp).format() + '\n';
