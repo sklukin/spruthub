@@ -1,5 +1,10 @@
 function sendToInfluxDB(aid, cid) {
     const chr = Hub.getCharacteristic(aid, cid);
+
+    // If that virtual sensor about temperature and dont have humidity sensor
+    if (chr === null) {
+        return;
+    }
     
     const service = chr.getService();
     const serviceName = service.getName();
