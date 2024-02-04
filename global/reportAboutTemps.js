@@ -20,7 +20,7 @@ const list = [
     77, 
 ];
 
-function getTempList() {
+function getSensorsList() {
     return list;
 }
 
@@ -28,7 +28,7 @@ function reportAboutTemps() {
     let res = '';
 
     list.forEach(function(item) {
-        res = res + Hub.getCharacteristic(item[0], charTemp).format() + '\n';
+        res = res + Hub.getCharacteristic(item, charTemp).format() + '\n';
     });
 
     return res;

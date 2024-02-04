@@ -4,6 +4,8 @@ const bucket = 'sensors';
 const token = '...your-token...'; 
 
 function writeToInfluxDB(measurement, tags, fields) {
+    const body = "${measurement},${tags.replace(' ', '-')} ${fields.replace(' ', '-')} ${Date.now()}";
+    // log.info(body);
     try {
         let h = HttpClient.POST(server)
             .header('Authorization', "Token ${token}")
@@ -13,8 +15,9 @@ function writeToInfluxDB(measurement, tags, fields) {
             .queryString('org', org)
             .queryString('bucket', bucket)
             .queryString('precision', 'ms')
-            .body("${measurement},${tags.replace(' ', '\\ ')} ${fields.replace(' ', '\\ ')} ${Date.now()}")
+            .body(body)
             .send();
+        // log.info(h);
     } catch(e) {
         log.error(e.message);
     }
