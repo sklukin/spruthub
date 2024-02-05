@@ -1,6 +1,6 @@
 const org = 'copper';
 const server = 'http://192.168.1.68:8086';
-const token = 'AK2rhKCvXG7sxbzivicYQQ2OFUimAaooxdM9tp-kV4_GBjmJXkP7_BdzAURpU8F-0zHWta4TVTo4AUesUk3Fqw=='; 
+const token = '...token...'; 
 const bucket = 'sensors';
 
 function writeToInfluxDB(measurement, tags, fields) {
@@ -31,20 +31,8 @@ function sendToInfluxDB(aid, cid) {
         log.info("Could not find characteristic for ${aid} ${cid}");
         return;
     }
-    
-    const service = chr.getService();
-    const serviceName = service.getName();
-    const serviceType = service.getType();
 
-    const accessory = service.getAccessory()
-    const accessoryName = accessory.getName();
-    
-    const roomName = accessory.getRoom().getName();
-    let value = chr.getValue()
+    const data = global.getDataForMetrics(chr);
 
-    const tags = "room=${roomName},accessory=${accessoryName},type=${serviceType},service=${serviceName}";
-
-    // log.info(tags); log.info("value ${value}");
-    
-    global.writeToInfluxDB('sensors', tags, "value=${value}")
+    global.writeToInfluxDB('sensors', data.tags, data.value);
 }
