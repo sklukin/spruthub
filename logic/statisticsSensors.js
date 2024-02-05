@@ -60,6 +60,6 @@ function trigger(source, value, variables, options) {
     const roomName = accessory.getRoom().getName();
     const tags = "room=${roomName},accessory=${accessoryName},type=${serviceType},service=${serviceName}";
     
-    global.writeToInfluxDB('sensors', tags, "value=${value}");
+    // global.writeToInfluxDB('sensors', tags, "value=${value}");
     global.writeToVM('sensors', tags, "value=${value}");
 }
