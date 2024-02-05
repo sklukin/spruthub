@@ -7,8 +7,10 @@ let list = global.getSensorsList();
 
 list.forEach(function(aid) {
     global.sendToInfluxDB(aid, charTemp);
+    global.sendToVM(aid, charTemp);
 });
 
 list.forEach(function(aid) {
     global.sendToInfluxDB(aid, charHum);
+    global.sendToVM(aid, charHum);
 });

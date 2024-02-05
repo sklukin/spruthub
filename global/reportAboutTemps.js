@@ -15,6 +15,7 @@ const list = [
     75, 
     76, 
     77, 
+    78,
 ];
 
 function getSensorsList() {
