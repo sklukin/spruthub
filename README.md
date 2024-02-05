@@ -8,10 +8,6 @@
 
 The right choice is VictoriMetrics
 
-## Scripts
-- send report about temps to telegram
-- send data about temperature and humidity to inFluxDB and then crate report in grafana
-
 ## About Metrics
 What way for send
 - By cron
