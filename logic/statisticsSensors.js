@@ -1,6 +1,6 @@
 info = {
     name: "Статистика датчиков",
-    description: "Отправка значений датчиков в InfluxDB",
+    description: "Сбор метрик датчиков и оптравка в InfluxDB VictoriMetrics",
     version: "0.1",
     author: "@sklukin",
     onStart: true,
@@ -45,21 +45,29 @@ function isAllowedSensor(type, options) {
 }
 
 function trigger(source, value, variables, options) {
+    if (!value) return;
+
     const accessory = source.getAccessory();
     const service = source.getService();
-
-    if (!isAllowedSensor(service.getType(), options)) {
-        log.info("Skip get statisitics for this sensor " + source);
-        return;
-    }
+    const roomName = accessory.getRoom().getName();
 
     const accessoryName = accessory.getName();
     const serviceName   = service.getName();
     const serviceType   = service.getType();
 
-    const roomName = accessory.getRoom().getName();
+    const log_info = "metrics for this sensor " + serviceName + "in room " + roomName + " value " + value;
+
+    log.info("Trigger collect " + log_info);
+
+    if (!isAllowedSensor(service.getType(), options)) {
+        log.info("Skip collect " + log_info);
+        return;
+    }
+
     const tags = "room=${roomName},accessory=${accessoryName},type=${serviceType},service=${serviceName}";
     
-    // global.writeToInfluxDB('sensors', tags, "value=${value}");
     global.writeToVM('sensors', tags, "value=${value}");
+    global.writeToInfluxDB('sensors', tags, "value=${value}");
+
+    log.info("Сollect " + log_info);
 }

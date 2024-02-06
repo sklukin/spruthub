@@ -6,7 +6,10 @@
 - Semd metrics to InfluxDB
 - Send metrics to VictoriaMetrics
 
-The right choice is VictoriMetrics
+Use InfluxDB for more Accuracy 
+Use VictoriaMetrics for more retintion data (like 5y)
+
+InfluxDB usualy work well with period about month
 
 ## About Metrics
 What way for send

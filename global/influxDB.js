@@ -1,10 +1,10 @@
 const org = 'copper';
 const server = 'http://192.168.1.68:8086';
-const token = '...token...'; 
+const token = '..token..';
 const bucket = 'sensors';
 
 function writeToInfluxDB(measurement, tags, fields) {
-    const body = "${measurement},${tags.replace(' ', '-')} ${fields.replace(' ', '-')} ${Date.now()}";
+    const body = global.makeBody(measurement, tags, fields);
     // log.info(body);
     try {
         let h = HttpClient.POST(server)
