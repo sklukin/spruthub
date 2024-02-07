@@ -25,3 +25,4 @@ What way for send
 
 Why both? If you want in grafana some report per hour and you have script base only trigger - you dont have enouth data
 
+![result](result.png)
