@@ -14,8 +14,8 @@ const list = [
     74, 
     75, 
     76, 
-    77, 
-    78,
+    77,
+    78, 
 ];
 
 function getSensorsList() {
@@ -28,10 +28,17 @@ function reportAboutTemps() {
     // Because the list above is also used to send to the database and this will 
     // interfere with the calculation of the average value at the database level. 
     // But in the telegram report I’m interested in these sensors
-    list.unshift(47, 81, 82);
+    const list2 = [47, 81, 82];
+    list.forEach(function(item) { list2.push(item); });
 
-    list.forEach(function(item) {
-        res = res + Hub.getCharacteristic(item, charTemp).format() + '\n';
+    list2.forEach(function(item) {
+        const char = Hub.getCharacteristic(item, charTemp);
+        if (char != null) {
+            res = res + char.format() + '\n';    
+        }
+        else {
+            log.info("Could not find sensor " + item);
+        }
     });
 
     return res;
