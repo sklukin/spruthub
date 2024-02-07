@@ -11,6 +11,13 @@ Use VictoriaMetrics for more retintion data (like 5y)
 
 InfluxDB usualy work well with period about month
 
+## Run DBs
+- Clone repo
+- cd docker/influxDB
+- docker compose up -d
+
+Repeaet for other
+
 ## About Metrics
 What way for send
 - By cron

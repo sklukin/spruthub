@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  influxdb:
+    image: influxdb:latest
+    container_name: influxdb
+    restart: always
+    ports:
+      - '8086:8086'
+    volumes:
+      - '$PWD/influxdb/data:/var/lib/influxdb2'
