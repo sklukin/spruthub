@@ -7,4 +7,4 @@ services:
     ports:
       - '8086:8086'
     volumes:
-      - '$PWD/influxdb/data:/var/lib/influxdb2'
+      - '$PWD/data:/var/lib/influxdb2'
