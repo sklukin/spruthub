@@ -57,7 +57,7 @@ function isAllowedSensor(type, options) {
         return false;
     }
 
-    if (type == HS.CarbonDioxideSensor && options.SkipHumidity) {
+    if (type == HS.CarbonDioxideSensor && options.SkipCO2) {
         return false;
     }
 
