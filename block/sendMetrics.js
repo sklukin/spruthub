@@ -1,16 +1,15 @@
 // Trigger by cron
 
-const charTemp = 15; // Characteristic about temp
-const charHum = 18; //  Characteristic about humidity
+// 15 - Characteristic about temp
+// 18 - Characteristic about humidity
+// 32 - Characteristic about CO2
 
-let list = global.getSensorsList();
+const chars = [15, 18, 32];
+const list = global.getSensorsList();
 
-list.forEach(function(aid) {
-    global.sendToInfluxDB(aid, charTemp);
-    global.sendToVM(aid, charTemp);
-});
-
-list.forEach(function(aid) {
-    global.sendToInfluxDB(aid, charHum);
-    global.sendToVM(aid, charHum);
+chars.forEach(function(charId){
+    list.forEach(function(aid) {
+        global.sendToInfluxDB(aid, charId);
+        global.sendToVM(aid, charId);
+    });
 });
