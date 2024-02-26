@@ -23,16 +23,7 @@ function writeToInfluxDB(measurement, tags, fields) {
     }
 }
 
-function sendToInfluxDB(aid, cid) {
-    const chr = Hub.getCharacteristic(aid, cid);
-
-    // If that virtual sensor about temperature and dont have humidity sensor
-    if (chr === null) {
-        log.info("Could not find characteristic for ${aid} ${cid}");
-        return;
-    }
-
+function sendCharToInfluxDB(chr) {
     const data = global.getDataForMetrics(chr);
-
     global.writeToInfluxDB('sensors', data.tags, data.value);
 }

@@ -39,16 +39,7 @@ function getDataForMetrics(chr) {
     };
 }
 
-function sendToVM(aid, cid) {
-    const chr = Hub.getCharacteristic(aid, cid);
-
-    // If that virtual sensor about temperature and dont have humidity sensor
-    if (chr === null) {
-        log.info("Could not find characteristic for ${aid} ${cid}");
-        return;
-    }
-
+function sendCharToVM(chr) {
     const data = global.getDataForMetrics(chr);
-
     global.writeToVM('sensors', data.tags, data.value);
 }
