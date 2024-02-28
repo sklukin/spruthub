@@ -24,7 +24,7 @@ function getCharsList() {
     return list;
 }
 
-function reportAboutTemps() {
+function reportSensors() {
     res = '';
     list.forEach(function(chr) {
         if (

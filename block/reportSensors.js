@@ -3,4 +3,4 @@
 var now = new Date();
 var hour = now.getHours(); // получаем текущий час
 
-global.sendToTelegram(["Текущий час: " + hour, global.reportAboutTemps()]);
+global.sendToTelegram(["Текущий час: " + hour, global.reportSensors()]);
