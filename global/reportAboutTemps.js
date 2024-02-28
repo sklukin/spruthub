@@ -27,7 +27,13 @@ function getCharsList() {
 function reportAboutTemps() {
     res = '';
     list.forEach(function(chr) {
-        res = res + chr.format() + '\n';    
+        if (
+            chr.getType() == HC.CurrentTemperature
+            ||
+            chr.getType() == HC.CarbonDioxideLevel
+        ) {
+            res = res + chr.format() + '\n';    
+        }
     });
 
     return res;
