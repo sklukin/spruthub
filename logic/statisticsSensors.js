@@ -1,12 +1,30 @@
 info = {
     name: "Статистика датчиков",
     description: "Сбор метрик датчиков и оптравка в InfluxDB VictoriMetrics",
-    version: "0.5",
+    version: "0.6",
     author: "@sklukin",
     onStart: true,
 
-    sourceServices: [HS.TemperatureSensor, HS.HumiditySensor, HS.CarbonDioxideSensor],
-    sourceCharacteristics: [HC.CurrentTemperature, HC.CurrentRelativeHumidity, HC.CarbonDioxideLevel],
+    sourceServices: [
+        HS.TemperatureSensor, 
+        HS.HumiditySensor, 
+        HS.CarbonDioxideSensor, 
+        HS.C_WattMeter,
+        HS.C_VoltMeter,
+        HS.C_AmpereMeter,
+        HS.LightSensor,
+        HS.AirQualitySensor,
+    ],
+    sourceCharacteristics: [
+        HC.CurrentTemperature, 
+        HC.CurrentRelativeHumidity, 
+        HC.CarbonDioxideLevel, 
+        HC.C_Watt,
+        HC.C_Volt,
+        HC.C_Ampere,
+        HC.CurrentAmbientLightLevel,
+        HC.VOCDensity,
+    ],
 
     variables: {
         active: true,

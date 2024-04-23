@@ -12,13 +12,22 @@ Hub.getAccessories().forEach(function(a) {
                 ch.getType() == HC.CurrentRelativeHumidity
                 ||
                 ch.getType() == HC.CarbonDioxideLevel
+                ||
+                ch.getType() == HC.C_Watt
+                ||
+                ch.getType() == HC.C_Volt
+                ||
+                ch.getType() == HC.C_Ampere
+                ||
+                ch.getType() == HC.CurrentAmbientLightLevel
+                ||
+                ch.getType() == HC.VOCDensity
             ) {
                 list.push(ch);
             }
         });
     })
 })
-
 
 function getCharsList() {
     return list;
