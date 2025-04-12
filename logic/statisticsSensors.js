@@ -6,24 +6,26 @@ info = {
     onStart: true,
 
     sourceServices: [
-        HS.TemperatureSensor, 
-        HS.HumiditySensor, 
-        HS.CarbonDioxideSensor, 
+        HS.TemperatureSensor,
+        HS.HumiditySensor,
+        HS.CarbonDioxideSensor,
         HS.C_WattMeter,
         HS.C_VoltMeter,
         HS.C_AmpereMeter,
         HS.LightSensor,
         HS.AirQualitySensor,
+        HS.C_KiloWattHourMeter,
     ],
     sourceCharacteristics: [
-        HC.CurrentTemperature, 
-        HC.CurrentRelativeHumidity, 
-        HC.CarbonDioxideLevel, 
+        HC.CurrentTemperature,
+        HC.CurrentRelativeHumidity,
+        HC.CarbonDioxideLevel,
         HC.C_Watt,
         HC.C_Volt,
         HC.C_Ampere,
         HC.CurrentAmbientLightLevel,
         HC.VOCDensity,
+        HC.C_KiloWattHour,
     ],
 
     variables: {
@@ -86,12 +88,12 @@ function trigger(source, value, variables, options) {
     if (!value) return;
 
     const accessory = source.getAccessory();
-    const service   = source.getService();
-    const roomName  = accessory.getRoom().getName();
+    const service = source.getService();
+    const roomName = accessory.getRoom().getName();
 
     const accessoryName = accessory.getName();
-    const serviceName   = service.getName();
-    const serviceType   = service.getType();
+    const serviceName = service.getName();
+    const serviceType = service.getType();
 
     const log_info = "metrics for this sensor " + serviceName + " in room " + roomName + " value " + value;
 
@@ -107,7 +109,7 @@ function trigger(source, value, variables, options) {
     }
 
     const tags = "room=${roomName},accessory=${accessoryName},type=${serviceType},service=${serviceName}";
-    
+
     global.writeToVM('sensors', tags, "value=${value}");
     global.writeToInfluxDB('sensors', tags, "value=${value}");
 
