@@ -1,8 +1,10 @@
+// Сделано на основе статить https://sprut.ai/article/kovyryaem-starline-chast-1-3?ysclid=m9b5mggu9v448867791
+// И кода https://github.com/ZeroBLYNK/SH_StarlLine/blob/main/StarLine_SH.json
 info = {
     name: "StarLine",
     description: "Авторизация и получение slnet кода. Обязательно активируйте параметр логического сценария Последовательное выполенение. Идентификатор приложения appId и пароль secret можно получить в личном кабинете в разделе Разработчикам на my.starline.ru.",
     version: "0.1",
-    author: "@Sergey_Bukreev",
+    author: "@sklukin",
     onStart: false,
 
     sourceServices: [HS.Switch],
