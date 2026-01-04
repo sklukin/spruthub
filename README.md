@@ -1,28 +1,35 @@
-# spruthub
+# SprütHub Metrics
 
-
-## Scripts
-- Report about temperature to telegram
-- Semd metrics to InfluxDB
-- Send metrics to VictoriaMetrics
-
-Use InfluxDB for more Accuracy 
-Use VictoriaMetrics for more retintion data (like 5y)
-
-InfluxDB usualy work well with period about month
+Скрипты для сбора метрик с датчиков умного дома (SprutHub) и отправки в time-series базы данных для визуализации в Grafana.
 
 ![result](result.png)
 
-## Run DBs
-- Clone repo
-- cd docker/influxDB
-- docker compose up -d
+## Возможности
 
-Repeaet for other
+- Сбор данных с температурных, влажностных, CO2 датчиков
+- Мониторинг потребления энергии (ваттметры, амперметры, вольтметры)
+- Отправка метрик в InfluxDB и VictoriaMetrics
+- Отчёты в Telegram
 
-## About Metrics
-What way for send
-- By cron
-- By trigger
+## Быстрый старт
 
-Why both? If you want in grafana some report per hour and you have script base only trigger - you dont have enouth data
+```bash
+# Запуск баз данных
+cd docker/influxDB && docker compose up -d
+cd docker/victoriaMetrics && docker compose up -d
+cd docker/grafana && docker compose up -d
+```
+
+Подробное руководство: [docs/start.md](docs/start.md)
+
+## Почему две базы данных?
+
+| База | Назначение | Retention |
+|------|------------|-----------|
+| InfluxDB | Точные данные за короткий период | ~1 месяц |
+| VictoriaMetrics | Долгосрочное хранение | 5 лет |
+
+## Способы сбора метрик
+
+- **Trigger** — при каждом изменении датчика
+- **Cron** — периодически, для почасовых отчётов в Grafana
