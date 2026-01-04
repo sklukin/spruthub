@@ -1,4 +1,4 @@
-# SprütHub Metrics
+# SprutHub Metrics
 
 Скрипты для сбора метрик с датчиков умного дома (SprutHub) и отправки в time-series базы данных для визуализации в Grafana.
 
