@@ -23,6 +23,11 @@ const COLORS = {
     HOT: "#FF0000"         // красный
 };
 
+// Пороги температуры (°C)
+const VERY_COLD_THRESHOLD = -20;   // ниже — фиолетовый
+const COLD_THRESHOLD = -12;       // ниже — синий
+const HOT_THRESHOLD = 10;        // выше — красный
+
 // Невалидное значение 
 const INVALID_TEMP = -100;
 
@@ -59,33 +64,6 @@ info = {
     sourceCharacteristics: [HC.CurrentTemperature],
 
     options: {
-        veryColdThreshold: {
-            type: "Double",
-            value: 0,
-            minValue: -50,
-            maxValue: 50,
-            step: 1,
-            name: { ru: "Очень холодно (°C)", en: "Very cold (°C)" },
-            desc: { ru: "Ниже этого порога — фиолетовый цвет", en: "Below this — purple color" }
-        },
-        coldThreshold: {
-            type: "Double",
-            value: 18,
-            minValue: -20,
-            maxValue: 50,
-            step: 1,
-            name: { ru: "Холодно (°C)", en: "Cold (°C)" },
-            desc: { ru: "Ниже этого порога — синий цвет", en: "Below this — blue color" }
-        },
-        hotThreshold: {
-            type: "Double",
-            value: 24,
-            minValue: 0,
-            maxValue: 50,
-            step: 1,
-            name: { ru: "Жарко (°C)", en: "Hot (°C)" },
-            desc: { ru: "Выше этого порога — красный цвет", en: "Above this — red color" }
-        },
         debug: {
             type: "Boolean",
             value: false,
@@ -104,12 +82,6 @@ info = {
 // ============================================================================
 
 var scenarioStartTime = Date.now();
-
-// Применяем настройки ко всем часам
-CLOCKS.forEach(function(clock) {
-    applyClockSettings(clock.ip);
-    log.info("AWTRIX [" + clock.name + "]: Настройки применены, часы перезагружаются");
-});
 
 // ============================================================================
 // MAIN TRIGGER FUNCTION
@@ -152,7 +124,7 @@ function trigger(source, value, variables, options, context) {
     var appName = "temp_" + transliterate(roomName).replace(/[^a-z0-9_]/g, '');
 
     // 6. Определение цвета по температуре
-    var color = getColorByTemp(value, options);
+    var color = getColorByTemp(value);
 
     // 7. Формат текста
     var tempText = Math.round(value) + "° " + roomName;
@@ -189,14 +161,14 @@ function trigger(source, value, variables, options, context) {
 /**
  * Определение цвета по температуре
  */
-function getColorByTemp(temp, options) {
-    if (temp < options.veryColdThreshold) {
+function getColorByTemp(temp) {
+    if (temp < VERY_COLD_THRESHOLD) {
         return COLORS.VERY_COLD;  // фиолетовый
     }
-    if (temp < options.coldThreshold) {
+    if (temp < COLD_THRESHOLD) {
         return COLORS.COLD;       // синий
     }
-    if (temp <= options.hotThreshold) {
+    if (temp <= HOT_THRESHOLD) {
         return COLORS.COMFORT;    // зелёный
     }
     return COLORS.HOT;            // красный
@@ -290,7 +262,6 @@ function applyClockSettings(ip) {
 // UNIT TESTS
 // ============================================================================
 
-var isDeveloping = true;  // Установить true для запуска тестов
 var inTestMode = false;
 
 // Хранилище HTTP-запросов для проверки в тестах
@@ -364,9 +335,6 @@ function createTestTemperatureSensor(roomName, temperature) {
  */
 function getDefaultOptions() {
     return {
-        veryColdThreshold: 0,
-        coldThreshold: 18,
-        hotThreshold: 24,
         debug: false
     };
 }
@@ -406,10 +374,6 @@ function arrayEvery(arr, predicate) {
  * Запуск всех тестов
  */
 function runTests() {
-    if (!isDeveloping) {
-        return;
-    }
-
     if (!global.hasUnitTests) {
         log.warn("AWTRIX Tests: Сценарий UnitTests не установлен");
         return;
@@ -435,81 +399,65 @@ function runTests() {
 
         log.info("AWTRIX Tests: Тест getColorByTemp()");
 
-        var options = getDefaultOptions();
+        // Тесты используют текущие пороги из констант:
+        // VERY_COLD_THRESHOLD, COLD_THRESHOLD, HOT_THRESHOLD
 
-        // Очень холодно (< 0)
+        // Очень холодно (< VERY_COLD_THRESHOLD)
         assertEquals(
-            getColorByTemp(-10, options),
+            getColorByTemp(VERY_COLD_THRESHOLD - 10),
             COLORS.VERY_COLD,
-            "getColorByTemp: -10° должен быть фиолетовым"
+            "getColorByTemp: ниже VERY_COLD_THRESHOLD должен быть фиолетовым"
         );
         assertEquals(
-            getColorByTemp(-1, options),
+            getColorByTemp(VERY_COLD_THRESHOLD - 0.1),
             COLORS.VERY_COLD,
-            "getColorByTemp: -1° должен быть фиолетовым"
+            "getColorByTemp: чуть ниже VERY_COLD_THRESHOLD должен быть фиолетовым"
         );
 
-        // Холодно (0 <= temp < 18)
+        // Холодно (VERY_COLD_THRESHOLD <= temp < COLD_THRESHOLD)
         assertEquals(
-            getColorByTemp(0, options),
+            getColorByTemp(VERY_COLD_THRESHOLD),
             COLORS.COLD,
-            "getColorByTemp: 0° должен быть синим"
+            "getColorByTemp: на границе VERY_COLD_THRESHOLD должен быть синим"
         );
         assertEquals(
-            getColorByTemp(10, options),
+            getColorByTemp((VERY_COLD_THRESHOLD + COLD_THRESHOLD) / 2),
             COLORS.COLD,
-            "getColorByTemp: 10° должен быть синим"
+            "getColorByTemp: между VERY_COLD и COLD должен быть синим"
         );
         assertEquals(
-            getColorByTemp(17.9, options),
+            getColorByTemp(COLD_THRESHOLD - 0.1),
             COLORS.COLD,
-            "getColorByTemp: 17.9° должен быть синим"
+            "getColorByTemp: чуть ниже COLD_THRESHOLD должен быть синим"
         );
 
-        // Комфортно (18 <= temp <= 24)
+        // Комфортно (COLD_THRESHOLD <= temp <= HOT_THRESHOLD)
         assertEquals(
-            getColorByTemp(18, options),
+            getColorByTemp(COLD_THRESHOLD),
             COLORS.COMFORT,
-            "getColorByTemp: 18° должен быть зелёным"
+            "getColorByTemp: на границе COLD_THRESHOLD должен быть зелёным"
         );
         assertEquals(
-            getColorByTemp(22, options),
+            getColorByTemp((COLD_THRESHOLD + HOT_THRESHOLD) / 2),
             COLORS.COMFORT,
-            "getColorByTemp: 22° должен быть зелёным"
+            "getColorByTemp: между COLD и HOT должен быть зелёным"
         );
         assertEquals(
-            getColorByTemp(24, options),
+            getColorByTemp(HOT_THRESHOLD),
             COLORS.COMFORT,
-            "getColorByTemp: 24° должен быть зелёным"
+            "getColorByTemp: на границе HOT_THRESHOLD должен быть зелёным"
         );
 
-        // Жарко (> 24)
+        // Жарко (> HOT_THRESHOLD)
         assertEquals(
-            getColorByTemp(24.1, options),
+            getColorByTemp(HOT_THRESHOLD + 0.1),
             COLORS.HOT,
-            "getColorByTemp: 24.1° должен быть красным"
+            "getColorByTemp: чуть выше HOT_THRESHOLD должен быть красным"
         );
         assertEquals(
-            getColorByTemp(30, options),
+            getColorByTemp(HOT_THRESHOLD + 20),
             COLORS.HOT,
-            "getColorByTemp: 30° должен быть красным"
-        );
-
-        // Кастомные пороги
-        var customOptions = {
-            veryColdThreshold: -10,
-            coldThreshold: 15,
-            hotThreshold: 28
-        };
-        assertEquals(
-            getColorByTemp(-5, customOptions),
-            COLORS.COLD,
-            "getColorByTemp: -5° с порогом -10 должен быть синим"
-        );
-        assertEquals(
-            getColorByTemp(26, customOptions),
-            COLORS.COMFORT,
-            "getColorByTemp: 26° с порогом 28 должен быть зелёным"
+            "getColorByTemp: сильно выше HOT_THRESHOLD должен быть красным"
         );
 
         log.info("AWTRIX Tests: getColorByTemp() - OK");
@@ -638,7 +586,11 @@ function runTests() {
         scenarioStartTime = Date.now() - REBOOT_DELAY - 1000;
         variables = { createdApps: {} };
 
-        trigger(source, 22.7, variables, getDefaultOptions(), "TEST");
+        // Используем температуру в диапазоне комфорта для текущих порогов
+        var comfortTemp = (COLD_THRESHOLD + HOT_THRESHOLD) / 2;
+        var expectedColor = getColorByTemp(comfortTemp);
+
+        trigger(source, comfortTemp, variables, getDefaultOptions(), "TEST");
 
         var customRequest = arrayFind(httpRequests, function(req) {
             return req.pathSegment.indexOf("api/custom") === 0;
@@ -647,9 +599,9 @@ function runTests() {
         assertNotNull(customRequest, "payload: Должен быть запрос на /api/custom");
 
         var payload = JSON.parse(customRequest.bodyContent);
-        assertEquals(payload.text, "23° Спальня", "payload: Текст должен быть '23° Спальня' (округлено)");
+        assertEquals(payload.text, Math.round(comfortTemp) + "° Спальня", "payload: Текст должен содержать температуру и комнату");
         assertEquals(payload.icon, 2056, "payload: Иконка должна быть 2056");
-        assertEquals(payload.color, COLORS.COMFORT, "payload: Цвет должен быть зелёным (комфорт)");
+        assertEquals(payload.color, expectedColor, "payload: Цвет должен соответствовать температуре");
         assertEquals(payload.lifetime, 3600, "payload: Lifetime должен быть 3600");
 
         log.info("AWTRIX Tests: payload данных - OK");
@@ -709,3 +661,12 @@ function runTests() {
 
 // Запуск тестов
 runTests();
+
+// ============================================================================
+// ПРИМЕНЕНИЕ НАСТРОЕК К ЧАСАМ (после тестов)
+// ============================================================================
+
+CLOCKS.forEach(function(clock) {
+    applyClockSettings(clock.ip);
+    log.info("AWTRIX [" + clock.name + "]: Настройки применены, часы перезагружаются");
+});
