@@ -2,9 +2,44 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Naming
+
+**Правильно:** SprutHub (без умлаута)
+**Неправильно:** SprütHub, Sprüt Hub
+
+## Important Notes
+
+- **Нет `console`** — в SprutHub нет объекта `console`. Используй `log.info()`, `log.warn()`, `log.error()` для логирования.
+- **ES5 только** — Nashorn не поддерживает многие ES6+ методы массивов: `find()`, `every()`, `some()`, `includes()`, `findIndex()`. Используй циклы или полифиллы.
+
+## База знаний для сценариев
+
+**ОБЯЗАТЕЛЬНО** при создании или изменении сценариев используй документацию из `docs/ScenarioTemplate/`:
+
+| Файл | Описание |
+|------|----------|
+| `README.md` | Принципы разработки, структура сценариев, best practices |
+| `LogicScenarioTemplate.js` | Шаблон логического сценария с примерами всех типов опций |
+| `spruthub.js` | TypeScript интерфейсы всех API (Hub, Accessory, Service, Characteristic, HttpClient, Cron, etc.) |
+| `sh_types.json` | Полный справочник всех типов сервисов (HS) и характеристик (HC) |
+
+**Workflow:**
+1. Перед созданием нового сценария — прочитай `LogicScenarioTemplate.js`
+2. При работе с API — сверяйся с `spruthub.js`
+3. При выборе типов сервисов/характеристик — используй `sh_types.json`
+
+## Тестирование
+
+**ОБЯЗАТЕЛЬНО** после каждого изменения сценария:
+1. Запусти тесты: `node logic/test-runner.js`
+2. Убедись что все тесты проходят
+3. Если тесты падают — исправь код или тесты
+
+**Если непонятно что править (код или тесты) — спроси у пользователя.**
+
 ## Project Overview
 
-SprütHub automation scripts for collecting IoT sensor metrics from HomeKit accessories and sending them to time-series databases (VictoriaMetrics, InfluxDB) for monitoring via Grafana.
+SprutHub automation scripts for collecting IoT sensor metrics from HomeKit accessories and sending them to time-series databases (VictoriaMetrics, InfluxDB) for monitoring via Grafana.
 
 ## Architecture
 
@@ -21,7 +56,7 @@ SprütHub automation scripts for collecting IoT sensor metrics from HomeKit acce
 
 - **block/** - Simple cron-triggered scripts
   - No `info` block required
-  - Scheduled via SprütHub cron configuration
+  - Scheduled via SprutHub cron configuration
 
 - **docker/** - Docker Compose files for databases
   - InfluxDB, VictoriaMetrics, Grafana
@@ -67,7 +102,7 @@ function compute(source, value, variables, options, context) {
 }
 ```
 
-## SprütHub Platform API
+## SprutHub Platform API
 
 JavaScript runtime uses Nashorn engine (ES5 + limited ES6: arrow functions, template literals, const/let, Map/Set, for...of). No destructuring, classes, modules, or promises.
 
