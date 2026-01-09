@@ -282,6 +282,10 @@ function applyClockSettings(ip) {
 
     sendToAwtrix(ip, "api/settings", settings);
 
+    // Установка текущего времени (Unix timestamp в секундах)
+    var unixTime = Math.floor(Date.now() / 1000);
+    sendToAwtrix(ip, "api/time", { time: unixTime });
+
     // Перезагрузка часов для применения настроек встроенных приложений
     sendToAwtrix(ip, "api/reboot", {});
 }
