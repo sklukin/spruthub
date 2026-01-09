@@ -23,7 +23,7 @@ const COLORS = {
     HOT: "#FF0000"         // красный
 };
 
-// Невалидное значение Aqara
+// Невалидное значение 
 const INVALID_TEMP = -100;
 
 // Настройки яркости
@@ -282,11 +282,7 @@ function applyClockSettings(ip) {
 
     sendToAwtrix(ip, "api/settings", settings);
 
-    // Установка текущего времени (Unix timestamp в секундах)
-    var unixTime = Math.floor(Date.now() / 1000);
-    sendToAwtrix(ip, "api/time", { time: unixTime });
-
-    // Перезагрузка часов для применения настроек встроенных приложений
+    // Перезагрузка часов для применения настроек
     sendToAwtrix(ip, "api/reboot", {});
 }
 
