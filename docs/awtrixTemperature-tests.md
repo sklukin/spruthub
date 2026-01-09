@@ -39,30 +39,23 @@ AWTRIX Tests: ВСЕ ТЕСТЫ ПРОЙДЕНЫ!
    - Скопируй `UnitTest/source/UnitTests.js` в глобальные сценарии хаба
    - Или установи через менеджер сценариев
 
-2. **Включи режим разработки** в `awtrixTemperature.js`:
-   ```javascript
-   var isDeveloping = true;  // Было false
-   ```
+2. **Сохрани сценарий** в SprutHub
 
-3. **Сохрани сценарий** в SprutHub
-
-4. **Проверь логи** — должно появиться:
+3. **Проверь логи** — должно появиться:
    ```
    [INFO] AWTRIX Tests: Запуск тестов...
    ...
    [INFO] AWTRIX Tests: ВСЕ ТЕСТЫ ПРОЙДЕНЫ!
+   [INFO] AWTRIX [Кухня]: Настройки применены, часы перезагружаются
    ```
 
-> **Важно:** В SprutHub нет объекта `console`, поэтому используется `log.info()`, `log.warn()`, `log.error()`.
-
-5. **Верни** `isDeveloping = false` после тестирования
+> **Важно:** Тесты запускаются автоматически при каждом сохранении сценария. После тестов применяются настройки к часам.
 
 ## Покрытие тестов
 
 | Функция | Тест | Описание |
 |---------|------|----------|
-| `getColorByTemp()` | Цветовые диапазоны | Проверка всех порогов: very cold, cold, comfort, hot |
-| `getColorByTemp()` | Кастомные пороги | Проверка с нестандартными значениями порогов |
+| `getColorByTemp()` | Цветовые диапазоны | Проверка всех порогов относительно констант |
 | `transliterate()` | Кириллица | "Спальня" → "spalnya" |
 | `transliterate()` | Пробелы/дефисы | "Детская комната" → "detskaya_komnata" |
 | `transliterate()` | Буква Ё | "Ёлка" → "yolka" |
@@ -148,24 +141,17 @@ var source = sensor.getService(HS.TemperatureSensor)
 
 ```javascript
 {
-    veryColdThreshold: 0,
-    coldThreshold: 18,
-    hotThreshold: 24,
     debug: false
 }
 ```
 
-> **Примечание:** Яркость теперь задаётся через константы `AUTO_BRIGHTNESS` и `MANUAL_BRIGHTNESS`, а не через опции.
+> **Примечание:** Пороги температуры и яркость задаются через константы, а не через опции.
 
 ## Устранение неполадок
 
 **Ошибка: "Сценарий UnitTests не установлен"**
 - Установи глобальный сценарий UnitTests из Sprut.Hub_Tools
 - Или используй Node.js runner (`node logic/test-runner.js`)
-
-**Тесты не запускаются**
-- Проверь что `isDeveloping = true` в `awtrixTemperature.js`
-- Для Node.js runner это делается автоматически
 
 **[FAIL] в выводе**
 - Тест не прошёл, смотри описание ошибки
