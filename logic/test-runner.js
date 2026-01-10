@@ -352,6 +352,9 @@ scenarios.forEach(function(scenario) {
         return;
     }
 
+    // Сброс состояния между сценариями
+    global.httpRequests = [];
+
     let scenarioCode = fs.readFileSync(scenarioPath, 'utf8');
 
     // Enable tests by replacing isDeveloping = false with true

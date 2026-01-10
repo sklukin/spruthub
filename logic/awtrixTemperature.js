@@ -36,13 +36,21 @@ const AUTO_BRIGHTNESS = false;
 const MANUAL_BRIGHTNESS = 50;  // 0-255, используется если AUTO_BRIGHTNESS = false
 
 // Время отображения приложения (секунды)
-const APP_DISPLAY_TIME = 10;
+const APP_DISPLAY_TIME = 30;
 
 // Время жизни приложения (секунды). Удаляется если нет обновлений.
 const APP_LIFETIME = 86400;  // 24 часа
 
+// Иконки по комнатам (название комнаты => ID иконки)
+// Если иконка найдена — показывается только температура с иконкой
+// Если не найдена — показывается температура с названием комнаты
+const ROOM_ICONS = {
+    "Улица": 4285,
+    "Гараж": 2083,
+};
+
 // Задержка после перезагрузки перед отправкой данных (мс)
-const REBOOT_DELAY = 30000;
+const REBOOT_DELAY = 5000;
 
 // Встроенные приложения AWTRIX (true = включено, false = выключено)
 const BUILTIN_APPS = {
@@ -129,18 +137,34 @@ function trigger(source, value, variables, options, context) {
     // 6. Определение цвета по температуре
     var color = getColorByTemp(value);
 
-    // 7. Формат текста
-    var tempText = Math.round(value) + "° " + roomName;
+    // 7. Проверяем есть ли иконка для комнаты
+    var roomIcon = ROOM_ICONS[roomName];
+    var hasIcon = roomIcon !== undefined;
 
-    // 8. Payload для custom app
+    // 8. Формат текста: с иконкой — только температура, без — с названием
+    var tempText;
+    if (hasIcon) {
+        tempText = Math.round(value) + "°";
+    } else {
+        var shortName = shortenName(roomName, 4);
+        tempText = Math.round(value) + "° " + shortName;
+    }
+
+    // 9. Payload для custom app
     var payload = {
         text: tempText,
-        icon: 2056,
         color: color,
+        noScroll: true,
         lifetime: APP_LIFETIME
     };
 
-    // 9. Отправка на все часы
+    // Добавляем иконку если есть для комнаты
+    if (hasIcon) {
+        payload.icon = roomIcon;
+        payload.pushIcon = 2;
+    }
+
+    // 10. Отправка на все часы
     CLOCKS.forEach(function(clock) {
         var success = sendToAwtrix(clock.ip, "api/custom", payload, { name: appName });
 
@@ -153,7 +177,7 @@ function trigger(source, value, variables, options, context) {
         }
     });
 
-    // 10. Сохранение информации о созданном приложении
+    // 11. Сохранение информации о созданном приложении
     variables.createdApps[serviceUUID] = appName;
 }
 
@@ -175,6 +199,16 @@ function getColorByTemp(temp) {
         return COLORS.COMFORT;    // зелёный
     }
     return COLORS.HOT;            // красный
+}
+
+/**
+ * Сокращение текста до N символов
+ */
+function shortenName(text, maxLength) {
+    if (text.length <= maxLength) {
+        return text;
+    }
+    return text.substring(0, maxLength);
 }
 
 /**
@@ -465,6 +499,28 @@ function runTests() {
 
         log.info("AWTRIX Tests: getColorByTemp() - OK");
 
+        // ==================== TEST: shortenName ====================
+
+        log.info("AWTRIX Tests: Тест shortenName()");
+
+        assertEquals(
+            shortenName("Спальня", 4),
+            "Спал",
+            "shortenName: 'Спальня' -> 'Спал'"
+        );
+        assertEquals(
+            shortenName("Кухня", 4),
+            "Кухн",
+            "shortenName: 'Кухня' -> 'Кухн'"
+        );
+        assertEquals(
+            shortenName("Зал", 4),
+            "Зал",
+            "shortenName: 'Зал' -> 'Зал' (короче 4)"
+        );
+
+        log.info("AWTRIX Tests: shortenName() - OK");
+
         // ==================== TEST: transliterate ====================
 
         log.info("AWTRIX Tests: Тест transliterate()");
@@ -570,8 +626,8 @@ function runTests() {
         log.info("AWTRIX Tests: Тест trigger() во время перезагрузки");
 
         resetTestState();
-        // Устанавливаем время старта в "недавнее прошлое" - часы ещё перезагружаются
-        scenarioStartTime = Date.now() - 5000;  // 5 секунд назад (< REBOOT_DELAY)
+        // Устанавливаем время старта так, чтобы прошло меньше REBOOT_DELAY
+        scenarioStartTime = Date.now() - Math.floor(REBOOT_DELAY / 2);
         variables = { createdApps: {} };
 
         trigger(source, 23, variables, getDefaultOptions(), "TEST");
@@ -602,8 +658,7 @@ function runTests() {
         assertNotNull(customRequest, "payload: Должен быть запрос на /api/custom");
 
         var payload = JSON.parse(customRequest.bodyContent);
-        assertEquals(payload.text, Math.round(comfortTemp) + "° Спальня", "payload: Текст должен содержать температуру и комнату");
-        assertEquals(payload.icon, 2056, "payload: Иконка должна быть 2056");
+        assertEquals(payload.text, Math.round(comfortTemp) + "° Спал", "payload: Текст должен содержать температуру и комнату");
         assertEquals(payload.color, expectedColor, "payload: Цвет должен соответствовать температуре");
         assertEquals(payload.lifetime, APP_LIFETIME, "payload: Lifetime должен быть APP_LIFETIME");
 
