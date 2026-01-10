@@ -16,6 +16,19 @@
 
 ---
 
+### AWTRIX Garage Door Indicator
+
+Индикатор статуса гаражных ворот на часах Ulanzi TC001 (AWTRIX 3).
+
+- Мигающий красный индикатор когда ворота не закрыты
+- До 3 ворот одновременно (indicator1, indicator2, indicator3)
+- Мгновенная реакция без задержки
+- Автоматический сброс индикаторов при сохранении сценария
+
+**Документация:** [docs/awtrixGarageDoor-setup.md](docs/awtrixGarageDoor-setup.md)
+
+---
+
 ### Metrics Collection
 
 Сбор метрик с датчиков и отправка в time-series базы данных для визуализации в Grafana.
