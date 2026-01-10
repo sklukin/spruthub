@@ -38,6 +38,9 @@ const MANUAL_BRIGHTNESS = 50;  // 0-255, используется если AUTO_
 // Время отображения приложения (секунды)
 const APP_DISPLAY_TIME = 10;
 
+// Время жизни приложения (секунды). Удаляется если нет обновлений.
+const APP_LIFETIME = 86400;  // 24 часа
+
 // Задержка после перезагрузки перед отправкой данных (мс)
 const REBOOT_DELAY = 30000;
 
@@ -134,7 +137,7 @@ function trigger(source, value, variables, options, context) {
         text: tempText,
         icon: 2056,
         color: color,
-        lifetime: 3600
+        lifetime: APP_LIFETIME
     };
 
     // 9. Отправка на все часы
@@ -602,7 +605,7 @@ function runTests() {
         assertEquals(payload.text, Math.round(comfortTemp) + "° Спальня", "payload: Текст должен содержать температуру и комнату");
         assertEquals(payload.icon, 2056, "payload: Иконка должна быть 2056");
         assertEquals(payload.color, expectedColor, "payload: Цвет должен соответствовать температуре");
-        assertEquals(payload.lifetime, 3600, "payload: Lifetime должен быть 3600");
+        assertEquals(payload.lifetime, APP_LIFETIME, "payload: Lifetime должен быть APP_LIFETIME");
 
         log.info("AWTRIX Tests: payload данных - OK");
 

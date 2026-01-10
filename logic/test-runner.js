@@ -15,7 +15,8 @@ global.HS = {
     TemperatureSensor: { toString: () => "TemperatureSensor" },
     HumiditySensor: { toString: () => "HumiditySensor" },
     Switch: { toString: () => "Switch" },
-    Lightbulb: { toString: () => "Lightbulb" }
+    Lightbulb: { toString: () => "Lightbulb" },
+    GarageDoorOpener: { toString: () => "GarageDoorOpener" }
 };
 
 // ============================================================================
@@ -25,7 +26,8 @@ global.HS = {
 global.HC = {
     CurrentTemperature: { toString: () => "CurrentTemperature" },
     CurrentRelativeHumidity: { toString: () => "CurrentRelativeHumidity" },
-    On: { toString: () => "On" }
+    On: { toString: () => "On" },
+    CurrentDoorState: { toString: () => "CurrentDoorState" }
 };
 
 // ============================================================================
@@ -327,50 +329,57 @@ global.createUnitTestFullAccessory = function(config) {
 };
 
 // ============================================================================
-// LOAD AND RUN SCENARIO
+// LOAD AND RUN SCENARIOS
 // ============================================================================
 
 const fs = require('fs');
 const path = require('path');
 
-// Read scenario file
-const scenarioPath = path.join(__dirname, 'awtrixTemperature.js');
-let scenarioCode = fs.readFileSync(scenarioPath, 'utf8');
+// Список сценариев с тестами
+const scenarios = [
+    { file: 'awtrixTemperature.js', name: 'AWTRIX Temperature Display' },
+    { file: 'awtrixGarageDoor.js', name: 'AWTRIX Garage Door Indicator' }
+];
 
-// Enable tests by replacing isDeveloping = false with true
-scenarioCode = scenarioCode.replace('var isDeveloping = false;', 'var isDeveloping = true;');
+let totalErrors = 0;
 
-// Create a wrapper to capture info object
-let info = null;
-const infoSetter = `
-var _originalInfo = info;
-Object.defineProperty(this, 'info', {
-    set: function(v) { _originalInfo = v; },
-    get: function() { return _originalInfo; }
-});
-`;
+scenarios.forEach(function(scenario) {
+    const scenarioPath = path.join(__dirname, scenario.file);
 
-console.log("=".repeat(60));
-console.log("AWTRIX Temperature Display - Unit Tests");
-console.log("=".repeat(60));
-console.log("");
-
-try {
-    // Execute scenario code
-    eval(scenarioCode);
-
-    console.log("");
-    console.log("=".repeat(60));
-
-    if (process.exitCode === 1) {
-        console.log("РЕЗУЛЬТАТ: ЕСТЬ ОШИБКИ");
-    } else {
-        console.log("РЕЗУЛЬТАТ: ВСЕ ТЕСТЫ ПРОЙДЕНЫ");
+    // Пропускаем если файл не существует
+    if (!fs.existsSync(scenarioPath)) {
+        console.log("[SKIP] " + scenario.name + " - файл не найден");
+        return;
     }
 
+    let scenarioCode = fs.readFileSync(scenarioPath, 'utf8');
+
+    // Enable tests by replacing isDeveloping = false with true
+    scenarioCode = scenarioCode.replace('var isDeveloping = false;', 'var isDeveloping = true;');
+
     console.log("=".repeat(60));
-} catch (e) {
-    console.error("[FATAL]", e.message);
-    console.error(e.stack);
-    process.exitCode = 1;
+    console.log(scenario.name + " - Unit Tests");
+    console.log("=".repeat(60));
+    console.log("");
+
+    try {
+        // Execute scenario code
+        eval(scenarioCode);
+    } catch (e) {
+        console.error("[FATAL]", e.message);
+        console.error(e.stack);
+        process.exitCode = 1;
+    }
+
+    console.log("");
+});
+
+console.log("=".repeat(60));
+
+if (process.exitCode === 1) {
+    console.log("РЕЗУЛЬТАТ: ЕСТЬ ОШИБКИ");
+} else {
+    console.log("РЕЗУЛЬТАТ: ВСЕ ТЕСТЫ ПРОЙДЕНЫ");
 }
+
+console.log("=".repeat(60));

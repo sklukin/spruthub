@@ -255,9 +255,7 @@ Cron → block/sendMetrics.js
 ## Running Databases
 
 ```bash
-cd docker/influxDB && docker compose up -d
-cd docker/victoriaMetrics && docker compose up -d
-cd docker/grafana && docker compose up -d
+cd docker && docker compose up -d
 ```
 
 ## Metrics Collection

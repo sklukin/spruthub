@@ -29,47 +29,64 @@
 
 ## 1. Установка баз данных
 
-Все базы данных запускаются через Docker Compose.
+Все сервисы запускаются одной командой через единый Docker Compose.
 
-### InfluxDB
-
-InfluxDB используется для точных данных за короткий период (~1 месяц).
+### Запуск всех сервисов
 
 ```bash
-cd docker/influxDB
+cd docker
 docker compose up -d
 ```
 
-После запуска:
+Это запустит:
+- **InfluxDB** — http://YOUR_SERVER_IP:8086 (краткосрочное хранение, ~1 месяц)
+- **VictoriaMetrics** — http://YOUR_SERVER_IP:8428 (долгосрочное хранение, 5 лет)
+- **Grafana** — http://YOUR_SERVER_IP:3000 (визуализация)
+
+### Структура папки docker/
+
+```
+docker/
+├── docker-compose.yaml   # Единый файл для всех сервисов
+├── grafana/
+│   ├── data/             # Данные Grafana
+│   └── grafana.ini       # Конфигурация
+├── influxdb/
+│   └── data/             # Данные InfluxDB
+└── victoriametrics/
+    └── data/             # Данные VictoriaMetrics
+```
+
+### Настройка InfluxDB
+
+После первого запуска:
 1. Открыть http://YOUR_SERVER_IP:8086
 2. Создать organization (например: `copper`)
 3. Создать bucket (например: `sensors`)
 4. Сгенерировать API Token (Data → API Tokens → Generate API Token)
 
-### VictoriaMetrics
+### Настройка Grafana
 
-VictoriaMetrics используется для долгосрочного хранения (5 лет).
-
-```bash
-cd docker/victoriaMetrics
-docker compose up -d
-```
-
-VictoriaMetrics доступен на http://YOUR_SERVER_IP:8428
-
-Настройка retention уже задана в docker-compose.yaml (`--retentionPeriod=5y`).
-
-### Grafana
-
-```bash
-cd docker/grafana
-docker compose up -d
-```
-
-После запуска:
+После первого запуска:
 1. Открыть http://YOUR_SERVER_IP:3000
 2. Войти с логином `admin` / паролем `admin`
 3. Сменить пароль
+
+### Полезные команды
+
+```bash
+# Остановить все сервисы
+cd docker && docker compose down
+
+# Перезапустить сервисы
+cd docker && docker compose restart
+
+# Посмотреть логи
+cd docker && docker compose logs -f
+
+# Посмотреть статус
+cd docker && docker compose ps
+```
 
 ---
 

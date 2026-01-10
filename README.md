@@ -33,10 +33,8 @@
 #### Быстрый старт
 
 ```bash
-# Запуск баз данных
-cd docker/influxDB && docker compose up -d
-cd docker/victoriaMetrics && docker compose up -d
-cd docker/grafana && docker compose up -d
+# Запуск всех сервисов одной командой
+cd docker && docker compose up -d
 ```
 
 #### Почему две базы данных?

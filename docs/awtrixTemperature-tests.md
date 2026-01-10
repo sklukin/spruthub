@@ -64,7 +64,7 @@ AWTRIX Tests: ВСЕ ТЕСТЫ ПРОЙДЕНЫ!
 | `trigger()` | null/undefined | Пропуск невалидных значений |
 | `trigger()` | -100 (Aqara offline) | Пропуск маркера оффлайн |
 | `trigger()` | Во время перезагрузки | Пропуск отправки пока часы перезагружаются |
-| `payload` | Структура JSON | text, icon, color, lifetime |
+| `payload` | Структура JSON | text, icon, color, lifetime (APP_LIFETIME) |
 | `settings` | Встроенные приложения | TIM, DAT, TEMP, HUM, BAT |
 | `settings` | Яркость | ABRI, BRI (из констант) |
 
