@@ -21,38 +21,38 @@ var _cronVariables = {
 // ============================================================================
 
 // Выбор баз данных (можно включить обе, одну или ни одной)
-var ENABLE_VM = true;
-var ENABLE_INFLUXDB = true;
+const ENABLE_VM = true;
+const ENABLE_INFLUXDB = true;
 
 // VictoriaMetrics configuration
-var VM_SERVER = 'http://192.168.1.68:8428';
+const VM_SERVER = 'http://192.168.1.68:8428';
 
 // InfluxDB configuration
-var INFLUX_SERVER = 'http://192.168.1.68:8086';
-var INFLUX_ORG = 'copper';
-var INFLUX_TOKEN = '..token..';
-var INFLUX_BUCKET = 'sensors';
+const INFLUX_SERVER = 'http://192.168.1.68:8086';
+const INFLUX_ORG = 'copper';
+const INFLUX_TOKEN = '..token..';
+const INFLUX_BUCKET = 'sensors';
 
 // Measurement name
-var MEASUREMENT = 'sensors';
+const MEASUREMENT = 'sensors';
 
 // Комнаты, которые исключаются из сбора метрик
-var EXCLUDED_ROOMS = [
+const EXCLUDED_ROOMS = [
     "Дом"
 ];
 
 // Настройки периодической отправки метрик
-var ENABLE_PERIODIC_SEND = true;
-var CRON_SCHEDULE = "0 0 * * * *";           // Раз в час
-var REFRESH_INTERVAL = "0 * * * * *";         // Раз в минуту
+const ENABLE_PERIODIC_SEND = true;
+const CRON_SCHEDULE = "0 0 * * * *";           // Раз в час
+const REFRESH_INTERVAL = "0 * * * * *";         // Раз в минуту
 
 // Настройки проверки доступности баз данных
-var ENABLE_HEALTH_CHECK = true;
-var HEALTH_CHECK_SCHEDULE = "0 0,30 * * * *"; // Раз в 30 минут
+const ENABLE_HEALTH_CHECK = true;
+const HEALTH_CHECK_SCHEDULE = "0 0,30 * * * *"; // Раз в 30 минут
 
 
 // Единый список характеристик для мониторинга
-var MONITORED_CHARACTERISTICS = [
+const MONITORED_CHARACTERISTICS = [
     HC.CurrentTemperature,
     HC.CurrentRelativeHumidity,
     HC.CarbonDioxideLevel,
@@ -65,7 +65,7 @@ var MONITORED_CHARACTERISTICS = [
 ];
 
 // Единый список сервисов для мониторинга
-var MONITORED_SERVICES = [
+const MONITORED_SERVICES = [
     HS.TemperatureSensor,
     HS.HumiditySensor,
     HS.CarbonDioxideSensor,
