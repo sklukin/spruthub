@@ -99,6 +99,10 @@ cd docker && docker compose ps
 Отредактировать константы в начале файла `logic/statisticsSensors.js`:
 
 ```javascript
+// Выбор баз данных (можно включить обе, одну или ни одной)
+var ENABLE_VM = true;
+var ENABLE_INFLUXDB = true;
+
 // VictoriaMetrics
 var VM_SERVER = 'http://YOUR_SERVER_IP:8428';
 

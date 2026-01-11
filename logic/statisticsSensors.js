@@ -20,6 +20,10 @@ var _cronVariables = {
 // SECTION 1: CONSTANTS
 // ============================================================================
 
+// Выбор баз данных (можно включить обе, одну или ни одной)
+var ENABLE_VM = true;
+var ENABLE_INFLUXDB = true;
+
 // VictoriaMetrics configuration
 var VM_SERVER = 'http://192.168.1.68:8428';
 
@@ -253,8 +257,8 @@ function sendAllMetrics(options) {
 
     for (var i = 0; i < list.length; i++) {
         var chr = list[i];
-        sendCharToVM(chr);
-        sendCharToInfluxDB(chr);
+        if (ENABLE_VM) sendCharToVM(chr);
+        if (ENABLE_INFLUXDB) sendCharToInfluxDB(chr);
     }
 
     if (options && options.ShowDebugLog) {
@@ -358,8 +362,8 @@ function trigger(source, value, variables, options) {
     var tags = "room=" + roomName + ",accessory=" + accessoryName + ",type=" + serviceType + ",service=" + serviceName;
     var fields = "value=" + value;
 
-    writeToVM(MEASUREMENT, tags, fields);
-    writeToInfluxDB(MEASUREMENT, tags, fields);
+    if (ENABLE_VM) writeToVM(MEASUREMENT, tags, fields);
+    if (ENABLE_INFLUXDB) writeToInfluxDB(MEASUREMENT, tags, fields);
 
     if (options.ShowDebugLog) {
         log.info("Metrics: " + serviceName + " in " + roomName + " = " + value);
@@ -411,8 +415,8 @@ function checkInfluxDBConnectivity() {
 }
 
 function checkConnectivity() {
-    var vmOk = checkVMConnectivity();
-    var influxOk = checkInfluxDBConnectivity();
+    var vmOk = ENABLE_VM ? checkVMConnectivity() : true;
+    var influxOk = ENABLE_INFLUXDB ? checkInfluxDBConnectivity() : true;
     return { vm: vmOk, influx: influxOk };
 }
 
@@ -424,10 +428,10 @@ function runHealthCheckWithNotification() {
     var result = checkConnectivity();
     var errors = [];
 
-    if (!result.vm) {
+    if (ENABLE_VM && !result.vm) {
         errors.push("VictoriaMetrics (" + VM_SERVER + ")");
     }
-    if (!result.influx) {
+    if (ENABLE_INFLUXDB && !result.influx) {
         errors.push("InfluxDB (" + INFLUX_SERVER + ")");
     }
 
