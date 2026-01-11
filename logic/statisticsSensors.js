@@ -296,6 +296,11 @@ function initCronJobs(options) {
         _cronVariables.healthCheckTask = null;
     }
 
+    // Проверяем, выбрана ли хотя бы одна база данных
+    if (!ENABLE_VM && !ENABLE_INFLUXDB) {
+        log.warn("Metrics: No database enabled (ENABLE_VM=false, ENABLE_INFLUXDB=false). Metrics will not be sent.");
+    }
+
     // Планируем отправку метрик
     if (ENABLE_PERIODIC_SEND) {
         var metricsSchedule = validateCron(CRON_SCHEDULE, "0 0 * * * *");
