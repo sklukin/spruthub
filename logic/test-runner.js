@@ -14,6 +14,13 @@
 global.HS = {
     TemperatureSensor: { toString: () => "TemperatureSensor" },
     HumiditySensor: { toString: () => "HumiditySensor" },
+    CarbonDioxideSensor: { toString: () => "CarbonDioxideSensor" },
+    C_WattMeter: { toString: () => "C_WattMeter" },
+    C_VoltMeter: { toString: () => "C_VoltMeter" },
+    C_AmpereMeter: { toString: () => "C_AmpereMeter" },
+    LightSensor: { toString: () => "LightSensor" },
+    AirQualitySensor: { toString: () => "AirQualitySensor" },
+    C_KiloWattHourMeter: { toString: () => "C_KiloWattHourMeter" },
     Switch: { toString: () => "Switch" },
     Lightbulb: { toString: () => "Lightbulb" },
     GarageDoorOpener: { toString: () => "GarageDoorOpener" }
@@ -26,6 +33,13 @@ global.HS = {
 global.HC = {
     CurrentTemperature: { toString: () => "CurrentTemperature" },
     CurrentRelativeHumidity: { toString: () => "CurrentRelativeHumidity" },
+    CarbonDioxideLevel: { toString: () => "CarbonDioxideLevel" },
+    C_Watt: { toString: () => "C_Watt" },
+    C_Volt: { toString: () => "C_Volt" },
+    C_Ampere: { toString: () => "C_Ampere" },
+    CurrentAmbientLightLevel: { toString: () => "CurrentAmbientLightLevel" },
+    VOCDensity: { toString: () => "VOCDensity" },
+    C_KiloWattHour: { toString: () => "C_KiloWattHour" },
     On: { toString: () => "On" },
     CurrentDoorState: { toString: () => "CurrentDoorState" }
 };
@@ -50,8 +64,30 @@ global.HttpClient = {
         path: function() { return this; },
         queryString: function() { return this; },
         body: function() { return this; },
+        timeout: function() { return this; },
+        send: function() { return { getStatus: () => 200 }; }
+    }),
+    GET: (url) => ({
+        header: function() { return this; },
+        path: function() { return this; },
+        queryString: function() { return this; },
+        timeout: function() { return this; },
         send: function() { return { getStatus: () => 200 }; }
     })
+};
+
+// ============================================================================
+// MOCK: Cron object
+// ============================================================================
+
+global.Cron = {
+    schedule: function(expression, handler) {
+        return { expression: expression, handler: handler, cancelled: false };
+    }
+};
+
+global.clear = function(task) {
+    if (task) task.cancelled = true;
 };
 
 // ============================================================================
@@ -338,7 +374,8 @@ const path = require('path');
 // Список сценариев с тестами
 const scenarios = [
     { file: 'awtrixTemperature.js', name: 'AWTRIX Temperature Display' },
-    { file: 'awtrixGarageDoor.js', name: 'AWTRIX Garage Door Indicator' }
+    { file: 'awtrixGarageDoor.js', name: 'AWTRIX Garage Door Indicator' },
+    { file: 'statisticsSensors.js', name: 'Statistics Sensors Metrics' }
 ];
 
 let totalErrors = 0;

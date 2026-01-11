@@ -39,7 +39,9 @@
 - Сбор данных с температурных, влажностных, CO2 датчиков
 - Мониторинг потребления энергии (ваттметры, амперметры, вольтметры)
 - Отправка метрик в InfluxDB и VictoriaMetrics
-- Отчёты в Telegram
+- Health check баз данных с уведомлениями в Telegram
+
+**Файл:** `logic/statisticsSensors.js`
 
 **Документация:** [docs/start.md](docs/start.md)
 
@@ -57,17 +59,21 @@ cd docker && docker compose up -d
 | InfluxDB | Точные данные за короткий период | ~1 месяц |
 | VictoriaMetrics | Долгосрочное хранение | 5 лет |
 
-#### Способы сбора метрик
+#### Как работает сбор метрик
 
-- **Trigger** — при каждом изменении датчика
-- **Cron** — периодически, для почасовых отчётов в Grafana
+```
+logic/statisticsSensors.js
+├── trigger() → мгновенная отправка при изменении датчика
+├── cron (hourly) → отправка всех метрик
+├── cron (minute) → обновление списка устройств
+└── cron (30 min) → health check + Telegram alert
+```
 
 ## Структура
 
 ```
 logic/           # Логические сценарии (с info блоком)
-block/           # Простые сценарии (cron)
-global/          # Глобальные функции
+global/          # Глобальные функции (sendToTelegram)
 docker/          # Docker Compose для баз данных
-docs/            # Документация
+docs/            # Документация и шаблоны
 ```

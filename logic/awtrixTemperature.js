@@ -68,7 +68,7 @@ const BUILTIN_APPS = {
 info = {
     name: "AWTRIX Temperature Display",
     description: "Отправка температуры с датчиков на часы AWTRIX",
-    version: "1.0",
+    version: "1.1",
     author: "@sklukin",
     onStart: true,
     sourceServices: [HS.TemperatureSensor],

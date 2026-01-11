@@ -11,6 +11,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Нет `console`** — в SprutHub нет объекта `console`. Используй `log.info()`, `log.warn()`, `log.error()` для логирования.
 - **ES5 только** — Nashorn не поддерживает многие ES6+ методы массивов: `find()`, `every()`, `some()`, `includes()`, `findIndex()`. Используй циклы или полифиллы.
+- **Telegram** — для отправки сообщений в Telegram **ВСЕГДА** используй `global.sendToTelegram(message)`. Не реализуй отправку через HttpClient вручную.
+- **Cron формат** — SprutHub использует 6-полевой cron: `секунда минута час день месяц день_недели`. Пример: `"0 0,30 * * * *"` — каждые 30 минут.
+- **Options vs Constants** — опции (`info.options`) должны относиться к **конкретному датчику/устройству**, а не к сценарию в целом. Настройки сценария (cron-расписания, URL серверов, включение/выключение функций) должны быть **константами** в коде.
+- **Однократная инициализация** — объект `variables` в `trigger()` уникален для каждого датчика, поэтому флаг `variables.initialized` не работает для общей инициализации. Используй паттерн с версией скрипта:
+  ```javascript
+  var SCRIPT_VERSION = Date.now();  // Уникальная версия при загрузке
+  var _lastInitVersion = 0;
+
+  function trigger(source, value, variables, options) {
+      if (_lastInitVersion !== SCRIPT_VERSION) {
+          _lastInitVersion = SCRIPT_VERSION;
+          // Инициализация выполнится только один раз
+          initCronJobs();
+      }
+  }
+  ```
 
 ## База знаний для сценариев
 
@@ -45,21 +61,21 @@ SprutHub automation scripts for collecting IoT sensor metrics from HomeKit acces
 
 ### Directory Structure
 
-- **global/** - Shared utility functions available via `global.` namespace
-  - Database integrations (VictoriaMetrics, InfluxDB)
-  - Sensor data collection helpers
-  - External API integrations (AWTRIX clock)
+- **logic/** - Логические сценарии с блоком `info`
+  - `statisticsSensors.js` — сбор метрик и отправка в InfluxDB/VictoriaMetrics
+  - `awtrixTemperature.js` — отображение температуры на часах AWTRIX
+  - `awtrixGarageDoor.js` — индикатор гаражных ворот на AWTRIX
+  - `test-runner.js` — запуск unit-тестов
 
-- **logic/** - Complex business logic with `info` metadata blocks
-  - Triggered by sensor changes or on startup (`onStart: true`)
-  - Contains `trigger(source, value, variables, options)` function
+- **global/** - Глобальные функции (доступны через `global.`)
+  - `sendToTelegram.js` — отправка в Telegram
 
-- **block/** - Simple cron-triggered scripts
-  - No `info` block required
-  - Scheduled via SprutHub cron configuration
-
-- **docker/** - Docker Compose files for databases
+- **docker/** - Docker Compose для баз данных
   - InfluxDB, VictoriaMetrics, Grafana
+
+- **docs/** - Документация
+  - `start.md` — руководство по настройке
+  - `ScenarioTemplate/` — шаблоны и API
 
 ### Script Metadata Format
 
@@ -244,12 +260,11 @@ GlobalVariables / LocalVariables               // persistent storage
 ### Data Flow
 
 ```
-HomeKit Accessories → logic/statisticsSensors.js (trigger)
-                    ↘
-                      global/victoriMetrics.js → VictoriaMetrics (192.168.1.68:8428)
-                      global/influxDB.js       → InfluxDB (192.168.1.68:8086)
-                    ↗
-Cron → block/sendMetrics.js
+HomeKit Accessories → logic/statisticsSensors.js
+                         ├── trigger() → VictoriaMetrics + InfluxDB (при изменении датчика)
+                         ├── cron (hourly) → отправка всех метрик
+                         ├── cron (minute) → обновление списка устройств
+                         └── cron (30 min) → health check + Telegram alert
 ```
 
 ## Running Databases
@@ -260,12 +275,11 @@ cd docker && docker compose up -d
 
 ## Metrics Collection
 
-Two collection methods are used for completeness:
+`logic/statisticsSensors.js` — единый файл для сбора метрик:
+- **Trigger-based** — захватывает каждое изменение датчика
+- **Cron-based** — периодические снимки для агрегаций
 
-1. **Trigger-based** (`logic/statisticsSensors.js`) - Captures every sensor change
-2. **Cron-based** (`block/sendMetrics.js`) - Periodic snapshots for hourly/daily aggregations
-
-InfluxDB is used for short-term precision (~1 month), VictoriaMetrics for long-term retention (5 years).
+InfluxDB для краткосрочного хранения (~1 месяц), VictoriaMetrics для долгосрочного (5 лет).
 
 ## API Documentation
 

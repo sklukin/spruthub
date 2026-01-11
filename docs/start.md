@@ -92,32 +92,47 @@ cd docker && docker compose ps
 
 ## 2. Настройка скриптов SprutHub
 
-### VictoriaMetrics
+Все метрики собираются одним файлом: `logic/statisticsSensors.js`
 
-Отредактировать файл `global/victoriMetrics.js`:
+### Настройка подключения
 
-```javascript
-// Строка 1: изменить адрес сервера
-const server = 'http://YOUR_SERVER_IP:8428';
-```
-
-### InfluxDB
-
-Отредактировать файл `global/influxDB.js`:
+Отредактировать константы в начале файла `logic/statisticsSensors.js`:
 
 ```javascript
-// Строки 1-4: настроить подключение
-const org = 'copper';                        // ваша organization
-const server = 'http://YOUR_SERVER_IP:8086'; // адрес сервера
-const token = 'YOUR_INFLUXDB_TOKEN';         // API token из InfluxDB
-const bucket = 'sensors';                    // название bucket
+// VictoriaMetrics
+var VM_SERVER = 'http://YOUR_SERVER_IP:8428';
+
+// InfluxDB
+var INFLUX_SERVER = 'http://YOUR_SERVER_IP:8086';
+var INFLUX_ORG = 'copper';                    // ваша organization
+var INFLUX_TOKEN = 'YOUR_INFLUXDB_TOKEN';     // API token из InfluxDB
+var INFLUX_BUCKET = 'sensors';                // название bucket
 ```
 
-### Загрузка скриптов в SprutHub
+### Настройка расписания (опционально)
 
-1. Скопировать содержимое файлов из `global/` в глобальные скрипты SprutHub
-2. Скопировать содержимое файлов из `logic/` в логические сценарии
-3. Скопировать содержимое файлов из `block/` в блочные сценарии (с настройкой cron)
+```javascript
+var CRON_SCHEDULE = "0 0 * * * *";           // Отправка метрик (раз в час)
+var REFRESH_INTERVAL = "0 * * * * *";         // Обновление списка устройств (раз в минуту)
+var HEALTH_CHECK_SCHEDULE = "0 0,30 * * * *"; // Проверка доступности БД (раз в 30 мин)
+```
+
+**Формат cron**: 6 полей — `секунда минута час день месяц день_недели`
+
+### Загрузка в SprutHub
+
+1. Скопировать содержимое `logic/statisticsSensors.js` в логический сценарий SprutHub
+2. Сохранить сценарий — cron-задачи создадутся автоматически
+
+### Как работает сбор метрик
+
+```
+HomeKit Accessories → logic/statisticsSensors.js
+                         ├── trigger() → мгновенная отправка при изменении датчика
+                         ├── cron (hourly) → отправка всех метрик
+                         ├── cron (minute) → обновление списка устройств
+                         └── cron (30 min) → health check + Telegram alert
+```
 
 ---
 
@@ -525,5 +540,6 @@ avg by(type) (sensors_value{type="HumiditySensor"}[$interval1])
 - **InfluxDB** лучше подходит для детального анализа за последний месяц
 - **VictoriaMetrics** используйте для долгосрочных трендов (годы) и сравнения с прошлым годом (`offset 1y`)
 - Данные собираются двумя способами:
-  - **По триггеру** — при каждом изменении датчика
-  - **По cron** — периодически, для агрегированных отчётов
+  - **По триггеру** — при каждом изменении датчика (мгновенно)
+  - **По cron** — периодически раз в час (для агрегированных отчётов)
+- **Health check** — каждые 30 минут проверяется доступность InfluxDB и VictoriaMetrics, при недоступности отправляется уведомление в Telegram
