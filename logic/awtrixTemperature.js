@@ -36,7 +36,7 @@ const AUTO_BRIGHTNESS = false;
 const MANUAL_BRIGHTNESS = 50;  // 0-255, используется если AUTO_BRIGHTNESS = false
 
 // Время отображения приложения (секунды)
-const APP_DISPLAY_TIME = 30;
+const APP_DISPLAY_TIME = 10;
 
 // Время жизни приложения (секунды). Удаляется если нет обновлений.
 const APP_LIFETIME = 86400;  // 24 часа
@@ -412,7 +412,7 @@ function arrayEvery(arr, predicate) {
  */
 function runTests() {
     if (!global.hasUnitTests) {
-        log.warn("AWTRIX Tests: Сценарий UnitTests не установлен");
+        log.warn("AWTRIX Tests: Сценарий UnitTests не установлен. Скачать: https://github.com/sklukin/spruthub/blob/main/global/unitTests.js");
         return;
     }
 

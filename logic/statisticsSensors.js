@@ -503,7 +503,10 @@ function resetTestState() {
 }
 
 function runTests() {
-    if (!global.hasUnitTests) return;
+    if (!global.hasUnitTests) {
+        log.warn("Metrics Tests: Сценарий UnitTests не установлен. Скачать: https://github.com/sklukin/spruthub/blob/main/global/unitTests.js");
+        return;
+    }
 
     var assertEquals = global.assertEquals;
     var assertTrue = global.assertTrue;

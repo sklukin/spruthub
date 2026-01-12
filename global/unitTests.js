@@ -1,5 +1,8 @@
 // Функции assert для unit-тестирования сценариев в Sprut.Hub
 
+// Универсальный логгер: log на хабе, console локально
+var _log = (typeof log !== 'undefined') ? log : console;
+
 /**
  * Функция для проверки наличия данного сценария
  */
@@ -14,7 +17,7 @@ function assert(expression, message) {
   if (!expression) {
     const msg = "Ожидалось истинное значение, получено ложное";
     const errorMsg = message ? `${message}: ${msg}` : msg;
-    console.error(errorMsg);
+    _log.error(errorMsg);
   }
 }
 
@@ -27,7 +30,7 @@ function assertNull(value, message) {
   if (value !== null) {
     const msg = `Ожидалось null, получено ${value}`;
     const errorMsg = message ? `${message}: ${msg}` : msg;
-    console.error(errorMsg);
+    _log.error(errorMsg);
   }
 }
 
@@ -40,7 +43,7 @@ function assertNotNull(value, message) {
   if (value === null) {
     const msg = "Ожидалось не-null значение, получено null";
     const errorMsg = message ? `${message}: ${msg}` : msg;
-    console.error(errorMsg);
+    _log.error(errorMsg);
   }
 }
 
@@ -54,7 +57,7 @@ function assertEquals(actual, expected, message) {
   if (actual !== expected) {
     const msg = `Ожидалось ${expected}, получено ${actual}`;
     const errorMsg = message ? `${message}: ${msg}` : msg;
-    console.error(errorMsg);
+    _log.error(errorMsg);
   }
 }
 
@@ -68,7 +71,7 @@ function assertNotEquals(actual, notExpected, message) {
   if (actual === notExpected) {
     const msg = `Ожидалось значение, отличное от ${notExpected}, получено ${actual}`;
     const errorMsg = message ? `${message}: ${msg}` : msg;
-    console.error(errorMsg);
+    _log.error(errorMsg);
   }
 }
 
@@ -81,7 +84,7 @@ function assertTrue(value, message) {
   if (value !== true) {
     const msg = `Ожидалось true, получено ${value}`;
     const errorMsg = message ? `${message}: ${msg}` : msg;
-    console.error(errorMsg);
+    _log.error(errorMsg);
   }
 }
 
@@ -94,7 +97,7 @@ function assertFalse(value, message) {
   if (value !== false) {
     const msg = `Ожидалось false, получено ${value}`;
     const errorMsg = message ? `${message}: ${msg}` : msg;
-    console.error(errorMsg);
+    _log.error(errorMsg);
   }
 }
 
@@ -107,7 +110,7 @@ function assertDefined(value, message) {
   if (typeof value === "undefined") {
     const msg = "Ожидалось определённое значение, получено undefined";
     const errorMsg = message ? `${message}: ${msg}` : msg;
-    console.error(errorMsg);
+    _log.error(errorMsg);
   }
 }
 
@@ -121,7 +124,7 @@ function assertContains(array, element, message) {
   if (!Array.isArray(array) || array.indexOf(element) === -1) {
     const msg = `Ожидалось, что массив содержит ${element}, получено ${JSON.stringify(array)}`;
     const errorMsg = message ? `${message}: ${msg}` : msg;
-    console.error(errorMsg);
+    _log.error(errorMsg);
   }
 }
 
@@ -134,7 +137,7 @@ function assertEmpty(array, message) {
   if (!Array.isArray(array) || array.length > 0) {
     const msg = `Ожидался пустой массив, получено ${JSON.stringify(array)}`;
     const errorMsg = message ? `${message}: ${msg}` : msg;
-    console.error(errorMsg);
+    _log.error(errorMsg);
   }
 }
 
@@ -147,7 +150,7 @@ function assertNotEmpty(array, message) {
   if (!Array.isArray(array) || array.length === 0) {
     const msg = `Ожидался непустой массив, получено ${JSON.stringify(array)}`;
     const errorMsg = message ? `${message}: ${msg}` : msg;
-    console.error(errorMsg);
+    _log.error(errorMsg);
   }
 }
 
@@ -160,7 +163,7 @@ function assertLength(array, length, message) {
   if (array.length != length) {
     const msg = `Ожидалось ${length} элементов, получено ${array.length}`
     const errorMsg = message ? `${message}: ${msg}` : msg;
-    console.error(errorMsg);
+    _log.error(errorMsg);
   }
 }
 
@@ -397,60 +400,29 @@ let lampAcc = {
 */
 
 
-/**
- * Примеры использования для тестирования
- * Просто скопируйте эту функцию в свой сценарий и укажите свои assert проверки
- * А после неё добавьте ee вызов, что бы проверка выполнялась при каждом сохранении сценария:
- * runTests();
- * 
- * Тесты можно не удалять при публикации, если у пользователя сценария нет, они не запустятся.
- */
-function runTests() {
-  if (!global.hasUnitTests) {
-    // Перед публикацией сценария лучше убрать строчку с выводом предупреждения что бы у пользователей не появлялся этот варнинг,
-    // если у них не устанолён этот сценарий unit тестов (но он им и не нужен). 
-    console.warn("Сценарий Unit тестирования не установлен")
-    return
-  }
+// ============================================================================
+// ЭКСПОРТ ДЛЯ NODE.JS (локальный запуск тестов через test-runner.js)
+// ============================================================================
 
-  // Для удобства, что бы не указывать везде "global."
-  let assert = global.assert; let assertNull = global.assertNull; let assertNotNull = global.assertNotNull; let assertEquals = global.assertEquals; let assertNotEquals = global.assertNotEquals; let assertTrue = global.assertTrue; let assertFalse = global.assertFalse; let assertDefined = global.assertDefined; let assertContains = global.assertContains; let assertEmpty = global.assertEmpty; let assertNotEmpty = global.assertNotEmpty; let assertLength = global.assertLength;
-
-  // Тесты писать ниже. Всё что выше - копируйте себе в сценарий.
-
-  // Тесты для assert
-  assert(1 + 1 === 2, "Проверка суммы");
-  assert(1 + 1 === 3, "Проверка неверной суммы");
-
-  // Тесты для assertNull и assertNotNull
-  assertNull(null, "Проверка null");
-  assertNull("text", "Проверка не-null значения");
-  assertNotNull("text", "Проверка не-null значения");
-  assertNotNull(null, "Проверка null");
-
-  // Тесты для assertEquals и assertNotEquals
-  assertEquals(5, 5, "Проверка равенства чисел");
-  assertEquals(5, 6, "Проверка неравенства чисел");
-  assertNotEquals(5, 6, "Проверка неравенства чисел");
-  assertNotEquals(5, 5, "Проверка равенства чисел");
-
-  // Тесты для assertTrue и assertFalse
-  assertTrue(true, "Проверка истинности");
-  assertTrue(false, "Проверка ложности");
-  assertFalse(false, "Проверка ложности");
-  assertFalse(true, "Проверка истинности");
-
-  // Тесты для assertDefined
-  assertDefined(42, "Проверка определённого значения");
-  assertDefined(undefined, "Проверка undefined");
-
-  // Тесты для assertContains, assertEmpty и assertNotEmpty
-  assertContains([1, 2, 3], 2, "Проверка наличия элемента");
-  assertContains([1, 2, 3], 4, "Проверка отсутствия элемента");
-  assertEmpty([], "Проверка пустого массива");
-  assertEmpty([1, 2], "Проверка непустого массива");
-  assertNotEmpty([1, 2], "Проверка непустого массива");
-  assertNotEmpty([], "Проверка пустого массива");
-  assertLength([1, 2], 2, "Проверка наличия 2 элементов");
-  assertLength([], "Проверка наличия 2 элементов");
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    hasUnitTests: hasUnitTests,
+    assert: assert,
+    assertNull: assertNull,
+    assertNotNull: assertNotNull,
+    assertEquals: assertEquals,
+    assertNotEquals: assertNotEquals,
+    assertTrue: assertTrue,
+    assertFalse: assertFalse,
+    assertDefined: assertDefined,
+    assertContains: assertContains,
+    assertEmpty: assertEmpty,
+    assertNotEmpty: assertNotEmpty,
+    assertLength: assertLength,
+    createUnitTestCharacteristic: createUnitTestCharacteristic,
+    createUnitTestService: createUnitTestService,
+    createUnitTestAccessory: createUnitTestAccessory,
+    createUnitTestRoom: createUnitTestRoom,
+    createUnitTestFullAccessory: createUnitTestFullAccessory
+  };
 }

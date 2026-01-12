@@ -244,7 +244,7 @@ function arrayEvery(arr, predicate) {
  */
 function runTests() {
     if (!global.hasUnitTests) {
-        log.warn("AWTRIX Garage Tests: Сценарий UnitTests не установлен");
+        log.warn("AWTRIX Garage Tests: Сценарий UnitTests не установлен. Скачать: https://github.com/sklukin/spruthub/blob/main/global/unitTests.js");
         return;
     }
 
