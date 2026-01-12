@@ -15,18 +15,17 @@ const CLOCKS = [
     { name: "Спальня", ip: "192.168.1.66" }
 ];
 
-// Цвета по температуре
-const COLORS = {
-    VERY_COLD: "#9400D3",  // фиолетовый
-    COLD: "#0000FF",       // синий
-    COMFORT: "#00FF00",    // зелёный
-    HOT: "#FF0000"         // красный
+// Уровни температуры: пороги и цвета
+// threshold — верхняя граница диапазона (temp < threshold)
+// null означает "без ограничения" (самый горячий уровень)
+const TEMPERATURE_LEVELS = {
+    FREEZING: { threshold: -20, color: "#9400D3" },  // фиолетовый: < -20°C
+    COLD:     { threshold: -12, color: "#0000FF" },  // синий: -20 до -12°C
+    COOL:     { threshold: 0,   color: "#00FFFF" },  // голубой: -12 до 0°C
+    WARM:     { threshold: 15,  color: "#00FF00" },  // зелёный: 0 до 15°C
+    HOT:      { threshold: 25,  color: "#FFA500" },  // оранжевый: 15 до 25°C
+    BOILING:  { threshold: null, color: "#FF0000" }  // красный: >= 25°C
 };
-
-// Пороги температуры (°C)
-const VERY_COLD_THRESHOLD = -20;   // ниже — фиолетовый
-const COLD_THRESHOLD = -12;       // ниже — синий
-const HOT_THRESHOLD = 10;        // выше — красный
 
 // Невалидное значение 
 const INVALID_TEMP = -100;
@@ -189,16 +188,14 @@ function trigger(source, value, variables, options, context) {
  * Определение цвета по температуре
  */
 function getColorByTemp(temp) {
-    if (temp < VERY_COLD_THRESHOLD) {
-        return COLORS.VERY_COLD;  // фиолетовый
+    var levelOrder = ['FREEZING', 'COLD', 'COOL', 'WARM', 'HOT', 'BOILING'];
+    for (var i = 0; i < levelOrder.length; i++) {
+        var level = TEMPERATURE_LEVELS[levelOrder[i]];
+        if (level.threshold === null || temp < level.threshold) {
+            return level.color;
+        }
     }
-    if (temp < COLD_THRESHOLD) {
-        return COLORS.COLD;       // синий
-    }
-    if (temp <= HOT_THRESHOLD) {
-        return COLORS.COMFORT;    // зелёный
-    }
-    return COLORS.HOT;            // красный
+    return TEMPERATURE_LEVELS.BOILING.color;
 }
 
 /**
@@ -436,65 +433,103 @@ function runTests() {
 
         log.info("AWTRIX Tests: Тест getColorByTemp()");
 
-        // Тесты используют текущие пороги из констант:
-        // VERY_COLD_THRESHOLD, COLD_THRESHOLD, HOT_THRESHOLD
+        // Тесты используют пороги из TEMPERATURE_LEVELS
 
-        // Очень холодно (< VERY_COLD_THRESHOLD)
+        // FREEZING (< -20°C)
         assertEquals(
-            getColorByTemp(VERY_COLD_THRESHOLD - 10),
-            COLORS.VERY_COLD,
-            "getColorByTemp: ниже VERY_COLD_THRESHOLD должен быть фиолетовым"
+            getColorByTemp(TEMPERATURE_LEVELS.FREEZING.threshold - 10),
+            TEMPERATURE_LEVELS.FREEZING.color,
+            "getColorByTemp: ниже FREEZING.threshold должен быть фиолетовым"
         );
         assertEquals(
-            getColorByTemp(VERY_COLD_THRESHOLD - 0.1),
-            COLORS.VERY_COLD,
-            "getColorByTemp: чуть ниже VERY_COLD_THRESHOLD должен быть фиолетовым"
-        );
-
-        // Холодно (VERY_COLD_THRESHOLD <= temp < COLD_THRESHOLD)
-        assertEquals(
-            getColorByTemp(VERY_COLD_THRESHOLD),
-            COLORS.COLD,
-            "getColorByTemp: на границе VERY_COLD_THRESHOLD должен быть синим"
-        );
-        assertEquals(
-            getColorByTemp((VERY_COLD_THRESHOLD + COLD_THRESHOLD) / 2),
-            COLORS.COLD,
-            "getColorByTemp: между VERY_COLD и COLD должен быть синим"
-        );
-        assertEquals(
-            getColorByTemp(COLD_THRESHOLD - 0.1),
-            COLORS.COLD,
-            "getColorByTemp: чуть ниже COLD_THRESHOLD должен быть синим"
+            getColorByTemp(TEMPERATURE_LEVELS.FREEZING.threshold - 0.1),
+            TEMPERATURE_LEVELS.FREEZING.color,
+            "getColorByTemp: чуть ниже FREEZING.threshold должен быть фиолетовым"
         );
 
-        // Комфортно (COLD_THRESHOLD <= temp <= HOT_THRESHOLD)
+        // COLD (-20 до -12°C)
         assertEquals(
-            getColorByTemp(COLD_THRESHOLD),
-            COLORS.COMFORT,
-            "getColorByTemp: на границе COLD_THRESHOLD должен быть зелёным"
+            getColorByTemp(TEMPERATURE_LEVELS.FREEZING.threshold),
+            TEMPERATURE_LEVELS.COLD.color,
+            "getColorByTemp: на границе FREEZING должен быть синим"
         );
         assertEquals(
-            getColorByTemp((COLD_THRESHOLD + HOT_THRESHOLD) / 2),
-            COLORS.COMFORT,
-            "getColorByTemp: между COLD и HOT должен быть зелёным"
+            getColorByTemp((TEMPERATURE_LEVELS.FREEZING.threshold + TEMPERATURE_LEVELS.COLD.threshold) / 2),
+            TEMPERATURE_LEVELS.COLD.color,
+            "getColorByTemp: между FREEZING и COLD должен быть синим"
         );
         assertEquals(
-            getColorByTemp(HOT_THRESHOLD),
-            COLORS.COMFORT,
-            "getColorByTemp: на границе HOT_THRESHOLD должен быть зелёным"
+            getColorByTemp(TEMPERATURE_LEVELS.COLD.threshold - 0.1),
+            TEMPERATURE_LEVELS.COLD.color,
+            "getColorByTemp: чуть ниже COLD.threshold должен быть синим"
         );
 
-        // Жарко (> HOT_THRESHOLD)
+        // COOL (-12 до 0°C)
         assertEquals(
-            getColorByTemp(HOT_THRESHOLD + 0.1),
-            COLORS.HOT,
-            "getColorByTemp: чуть выше HOT_THRESHOLD должен быть красным"
+            getColorByTemp(TEMPERATURE_LEVELS.COLD.threshold),
+            TEMPERATURE_LEVELS.COOL.color,
+            "getColorByTemp: на границе COLD должен быть голубым"
         );
         assertEquals(
-            getColorByTemp(HOT_THRESHOLD + 20),
-            COLORS.HOT,
-            "getColorByTemp: сильно выше HOT_THRESHOLD должен быть красным"
+            getColorByTemp((TEMPERATURE_LEVELS.COLD.threshold + TEMPERATURE_LEVELS.COOL.threshold) / 2),
+            TEMPERATURE_LEVELS.COOL.color,
+            "getColorByTemp: между COLD и COOL должен быть голубым"
+        );
+        assertEquals(
+            getColorByTemp(TEMPERATURE_LEVELS.COOL.threshold - 0.1),
+            TEMPERATURE_LEVELS.COOL.color,
+            "getColorByTemp: чуть ниже COOL.threshold должен быть голубым"
+        );
+
+        // WARM (0 до 15°C)
+        assertEquals(
+            getColorByTemp(TEMPERATURE_LEVELS.COOL.threshold),
+            TEMPERATURE_LEVELS.WARM.color,
+            "getColorByTemp: на границе COOL должен быть зелёным"
+        );
+        assertEquals(
+            getColorByTemp((TEMPERATURE_LEVELS.COOL.threshold + TEMPERATURE_LEVELS.WARM.threshold) / 2),
+            TEMPERATURE_LEVELS.WARM.color,
+            "getColorByTemp: между COOL и WARM должен быть зелёным"
+        );
+        assertEquals(
+            getColorByTemp(TEMPERATURE_LEVELS.WARM.threshold - 0.1),
+            TEMPERATURE_LEVELS.WARM.color,
+            "getColorByTemp: чуть ниже WARM.threshold должен быть зелёным"
+        );
+
+        // HOT (15 до 25°C)
+        assertEquals(
+            getColorByTemp(TEMPERATURE_LEVELS.WARM.threshold),
+            TEMPERATURE_LEVELS.HOT.color,
+            "getColorByTemp: на границе WARM должен быть оранжевым"
+        );
+        assertEquals(
+            getColorByTemp((TEMPERATURE_LEVELS.WARM.threshold + TEMPERATURE_LEVELS.HOT.threshold) / 2),
+            TEMPERATURE_LEVELS.HOT.color,
+            "getColorByTemp: между WARM и HOT должен быть оранжевым"
+        );
+        assertEquals(
+            getColorByTemp(TEMPERATURE_LEVELS.HOT.threshold - 0.1),
+            TEMPERATURE_LEVELS.HOT.color,
+            "getColorByTemp: чуть ниже HOT.threshold должен быть оранжевым"
+        );
+
+        // BOILING (>= 25°C)
+        assertEquals(
+            getColorByTemp(TEMPERATURE_LEVELS.HOT.threshold),
+            TEMPERATURE_LEVELS.BOILING.color,
+            "getColorByTemp: на границе HOT должен быть красным"
+        );
+        assertEquals(
+            getColorByTemp(TEMPERATURE_LEVELS.HOT.threshold + 10),
+            TEMPERATURE_LEVELS.BOILING.color,
+            "getColorByTemp: выше HOT.threshold должен быть красным"
+        );
+        assertEquals(
+            getColorByTemp(50),
+            TEMPERATURE_LEVELS.BOILING.color,
+            "getColorByTemp: 50°C должен быть красным (BOILING)"
         );
 
         log.info("AWTRIX Tests: getColorByTemp() - OK");
@@ -645,11 +680,11 @@ function runTests() {
         scenarioStartTime = Date.now() - REBOOT_DELAY - 1000;
         variables = { createdApps: {} };
 
-        // Используем температуру в диапазоне комфорта для текущих порогов
-        var comfortTemp = (COLD_THRESHOLD + HOT_THRESHOLD) / 2;
-        var expectedColor = getColorByTemp(comfortTemp);
+        // Используем температуру в диапазоне WARM (0 до 15°C)
+        var warmTemp = (TEMPERATURE_LEVELS.COOL.threshold + TEMPERATURE_LEVELS.WARM.threshold) / 2;
+        var expectedColor = getColorByTemp(warmTemp);
 
-        trigger(source, comfortTemp, variables, getDefaultOptions(), "TEST");
+        trigger(source, warmTemp, variables, getDefaultOptions(), "TEST");
 
         var customRequest = arrayFind(httpRequests, function(req) {
             return req.pathSegment.indexOf("api/custom") === 0;
@@ -658,7 +693,7 @@ function runTests() {
         assertNotNull(customRequest, "payload: Должен быть запрос на /api/custom");
 
         var payload = JSON.parse(customRequest.bodyContent);
-        assertEquals(payload.text, Math.round(comfortTemp) + "° Спал", "payload: Текст должен содержать температуру и комнату");
+        assertEquals(payload.text, Math.round(warmTemp) + "° Спал", "payload: Текст должен содержать температуру и комнату");
         assertEquals(payload.color, expectedColor, "payload: Цвет должен соответствовать температуре");
         assertEquals(payload.lifetime, APP_LIFETIME, "payload: Lifetime должен быть APP_LIFETIME");
 
