@@ -46,7 +46,8 @@ global.HS = {
     C_KiloWattHourMeter: { toString: () => "C_KiloWattHourMeter" },
     Switch: { toString: () => "Switch" },
     Lightbulb: { toString: () => "Lightbulb" },
-    GarageDoorOpener: { toString: () => "GarageDoorOpener" }
+    GarageDoorOpener: { toString: () => "GarageDoorOpener" },
+    Outlet: { toString: () => "Outlet" }
 };
 
 // ============================================================================
@@ -132,7 +133,8 @@ const path = require('path');
 const scenarios = [
     { file: 'awtrixTemperature.js', name: 'AWTRIX Temperature Display' },
     { file: 'awtrixGarageDoor.js', name: 'AWTRIX Garage Door Indicator' },
-    { file: 'statisticsSensors.js', name: 'Statistics Sensors Metrics' }
+    { file: 'statisticsSensors.js', name: 'Statistics Sensors Metrics' },
+    { file: 'outletScheduler.js', name: 'Outlet Scheduler' }
 ];
 
 scenarios.forEach(function(scenario) {
