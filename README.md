@@ -12,7 +12,7 @@
 - Цвет по температуре (фиолетовый → синий → зелёный → красный)
 - Автоматическая настройка часов при сохранении сценария
 
-**Документация:** [docs/awtrixTemperature-setup.md](docs/awtrixTemperature-setup.md) | [Тесты](docs/awtrixTemperature-tests.md) | [Статья в блогк](https://sklukin.ru/posts/ulanzi-awtrix-temperature/)
+**Документация:** [docs/awtrixTemperature-setup.md](docs/awtrixTemperature-setup.md) | [Тесты](docs/awtrixTemperature-tests.md) | [Статья на sklukin.ru](https://sklukin.ru/posts/ulanzi-awtrix-temperature/)
 
 ---
 
@@ -58,7 +58,7 @@
 
 **Файл:** `logic/statisticsSensors.js`
 
-**Документация:** [docs/start.md](docs/start.md) | [Статья в блогк](https://sklukin.ru/posts/spruthub-grafana/)
+**Документация:** [docs/start.md](docs/start.md) | [Статья на sklukin.ru](https://sklukin.ru/posts/spruthub-grafana/)
 
 #### Быстрый старт
 
