@@ -51,19 +51,6 @@ const ENABLE_HEALTH_CHECK = true;
 const HEALTH_CHECK_SCHEDULE = "0 0,30 * * * *"; // Раз в 30 минут
 
 
-// Единый список характеристик для мониторинга
-const MONITORED_CHARACTERISTICS = [
-    HC.CurrentTemperature,
-    HC.CurrentRelativeHumidity,
-    HC.CarbonDioxideLevel,
-    HC.C_Watt,
-    HC.C_Volt,
-    HC.C_Ampere,
-    HC.CurrentAmbientLightLevel,
-    HC.VOCDensity,
-    HC.C_KiloWattHour
-];
-
 // Единый список сервисов для мониторинга
 const MONITORED_SERVICES = [
     HS.TemperatureSensor,
@@ -74,8 +61,24 @@ const MONITORED_SERVICES = [
     HS.C_AmpereMeter,
     HS.LightSensor,
     HS.AirQualitySensor,
-    HS.C_KiloWattHourMeter
+    HS.C_KiloWattHourMeter,
+    HS.AirQualitySensor
 ];
+
+// Единый список характеристик для мониторинга
+const MONITORED_CHARACTERISTICS = [
+    HC.CurrentTemperature,
+    HC.CurrentRelativeHumidity,
+    HC.CarbonDioxideLevel,
+    HC.C_Watt,
+    HC.C_Volt,
+    HC.C_Ampere,
+    HC.CurrentAmbientLightLevel,
+    HC.VOCDensity,
+    HC.C_KiloWattHour,
+    HC.PM2_5Density
+];
+
 
 // ============================================================================
 // SECTION 2: INFO BLOCK
