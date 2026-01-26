@@ -161,6 +161,7 @@ function writeToInfluxDB(measurement, tags, fields) {
 
 function getDataForMetrics(chr) {
     var service = chr.getService();
+    var chrType = chr.getType()
     var serviceName = service.getName();
     var serviceType = service.getType();
     var accessory = service.getAccessory();
@@ -169,7 +170,7 @@ function getDataForMetrics(chr) {
     var value = chr.getValue();
 
     return {
-        tags: "room=" + roomName + ",accessory=" + accessoryName + ",type=" + serviceType + ",service=" + serviceName,
+        tags: "room=" + roomName + ",accessory=" + accessoryName + ",type=" + serviceType + ",service=" + serviceName + ",chrType=" + chrType,
         value: "value=" + value
     };
 }
