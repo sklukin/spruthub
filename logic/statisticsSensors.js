@@ -62,7 +62,6 @@ const MONITORED_SERVICES = [
     HS.LightSensor,
     HS.AirQualitySensor,
     HS.C_KiloWattHourMeter,
-    HS.AirQualitySensor
 ];
 
 // Единый список характеристик для мониторинга
