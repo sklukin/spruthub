@@ -159,19 +159,19 @@ function writeToInfluxDB(measurement, tags, fields) {
 // SECTION 5: DATA EXTRACTION
 // ============================================================================
 
-function getDataForMetrics(chr) {
+function getDataForMetrics(chr, valueOverride) {
     var service = chr.getService();
-    var chrType = chr.getType()
+    var chrType = chr.getType();
     var serviceName = service.getName();
     var serviceType = service.getType();
     var accessory = service.getAccessory();
     var accessoryName = accessory.getName();
     var roomName = accessory.getRoom().getName();
-    var value = chr.getValue();
+    var value = (valueOverride !== undefined) ? valueOverride : chr.getValue();
 
     return {
         tags: "room=" + roomName + ",accessory=" + accessoryName + ",type=" + serviceType + ",service=" + serviceName + ",chrType=" + chrType,
-        value: "value=" + value
+        fields: "value=" + value
     };
 }
 
@@ -247,12 +247,12 @@ function refreshCharsList(options) {
 
 function sendCharToVM(chr) {
     var data = getDataForMetrics(chr);
-    writeToVM(MEASUREMENT, data.tags, data.value);
+    writeToVM(MEASUREMENT, data.tags, data.fields);
 }
 
 function sendCharToInfluxDB(chr) {
     var data = getDataForMetrics(chr);
-    writeToInfluxDB(MEASUREMENT, data.tags, data.value);
+    writeToInfluxDB(MEASUREMENT, data.tags, data.fields);
 }
 
 function sendAllMetrics(options) {
@@ -360,21 +360,13 @@ function trigger(source, value, variables, options) {
 
     if (!value) return;
 
-    var accessory = source.getAccessory();
-    var service = source.getService();
-    var roomName = accessory.getRoom().getName();
-    var accessoryName = accessory.getName();
-    var serviceName = service.getName();
-    var serviceType = service.getType();
+    var data = getDataForMetrics(source, value);
 
-    var tags = "room=" + roomName + ",accessory=" + accessoryName + ",type=" + serviceType + ",service=" + serviceName;
-    var fields = "value=" + value;
-
-    if (ENABLE_VM) writeToVM(MEASUREMENT, tags, fields);
-    if (ENABLE_INFLUXDB) writeToInfluxDB(MEASUREMENT, tags, fields);
+    if (ENABLE_VM) writeToVM(MEASUREMENT, data.tags, data.fields);
+    if (ENABLE_INFLUXDB) writeToInfluxDB(MEASUREMENT, data.tags, data.fields);
 
     if (options.ShowDebugLog) {
-        log.info("Metrics: " + serviceName + " in " + roomName + " = " + value);
+        log.info("Metrics: " + source.getService().getName() + " in " + source.getAccessory().getRoom().getName() + " = " + value);
     }
 }
 
@@ -569,10 +561,10 @@ function runTests() {
         var data = getDataForMetrics(chr);
 
         assertNotNull(data.tags, "getDataForMetrics: should return tags");
-        assertNotNull(data.value, "getDataForMetrics: should return value");
+        assertNotNull(data.fields, "getDataForMetrics: should return fields");
         assertTrue(data.tags.indexOf("room=Kitchen") >= 0, "getDataForMetrics: tags should contain room");
         assertTrue(data.tags.indexOf("accessory=Test Sensor") >= 0, "getDataForMetrics: tags should contain accessory");
-        assertEquals(data.value, "value=23.5", "getDataForMetrics: value should be formatted correctly");
+        assertEquals(data.fields, "value=23.5", "getDataForMetrics: fields should be formatted correctly");
 
         log.info("Metrics Tests: getDataForMetrics() - OK");
 
