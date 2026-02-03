@@ -27,6 +27,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
       }
   }
   ```
+## IMPORTANT: Release Checklist
+
+**При каждом релизе go-project-starter выполнить:**
+
+### 1. GitHub Release (ОБЯЗАТЕЛЬНО)
+
+**Тег != релиз!** После пуша тега обязательно создать GitHub Release.
+
+1. Найти последний релиз (не тег!): `gh release list --limit 1`
+2. Получить коммит последнего релиза: `gh release view <version> --json targetCommitish`
+3. Посмотреть изменения относительно последнего релиза:
+   ```bash
+   # Diff между релизами (не тегами!)
+   gh release view <prev-version> --json targetCommitish -q .targetCommitish
+   git log --oneline <prev-commit>..HEAD
+   ```
+4. Создать релиз с release notes:
+   ```bash
+   gh release create vX.Y.Z --title "vX.Y.Z" --notes "Release notes..."
+   ```
+
+**Важно:** Release notes составлять относительно коммита последнего релиза, а не последнего тега!
 
 ## База знаний для сценариев
 
@@ -261,8 +283,9 @@ GlobalVariables / LocalVariables               // persistent storage
 
 ```
 HomeKit Accessories → logic/statisticsSensors.js
-                         ├── trigger() → VictoriaMetrics + InfluxDB (при изменении датчика)
-                         ├── cron (hourly) → отправка всех метрик
+                         ├── trigger() → batch[] (накопление метрик)
+                         ├── setInterval (10 сек) → flush batch → VM + InfluxDB
+                         ├── cron (hourly) → отправка всех метрик (батчом)
                          ├── cron (minute) → обновление списка устройств
                          └── cron (30 min) → health check + Telegram alert
 ```
@@ -276,8 +299,13 @@ cd docker && docker compose up -d
 ## Metrics Collection
 
 `logic/statisticsSensors.js` — единый файл для сбора метрик:
-- **Trigger-based** — захватывает каждое изменение датчика
-- **Cron-based** — периодические снимки для агрегаций
+- **Trigger-based с батчингом** — метрики накапливаются в буфере и отправляются каждые 10 секунд (снижает нагрузку на хаб)
+- **Cron-based** — периодические снимки для агрегаций (всегда батчом)
+
+Константы батчинга:
+- `ENABLE_BATCH_MODE` — включить/выключить батчинг в trigger()
+- `BATCH_INTERVAL_MS` — интервал flush (по умолчанию 10000 мс)
+- `BATCH_SHOW_LOG` — логировать отправку батчей
 
 InfluxDB для краткосрочного хранения (~1 месяц), VictoriaMetrics для долгосрочного (5 лет).
 

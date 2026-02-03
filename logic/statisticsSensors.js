@@ -13,7 +13,9 @@ var _cronVariables = {
     metricsTask: null,
     refreshTask: null,
     healthCheckTask: null,
-    charsList: null
+    charsList: null,
+    batch: [],          // массив строк Line Protocol для батчинга
+    batchTask: null     // задача setInterval для flush
 };
 
 // ============================================================================
@@ -23,6 +25,11 @@ var _cronVariables = {
 // Выбор баз данных (можно включить обе, одну или ни одной)
 const ENABLE_VM = true;
 const ENABLE_INFLUXDB = true;
+
+// Батчинг метрик в trigger()
+const ENABLE_BATCH_MODE = true;  // false = текущее поведение, true = батчинг
+const BATCH_INTERVAL_MS = 10000;  // 10 секунд (только при ENABLE_BATCH_MODE = true)
+const BATCH_SHOW_LOG = false; // Логировать отправку батчей
 
 // VictoriaMetrics configuration
 const VM_SERVER = 'http://192.168.1.68:8428';
@@ -123,8 +130,7 @@ function makeBody(measurement, tags, fields) {
 // SECTION 4: DATABASE WRITERS
 // ============================================================================
 
-function writeToVM(measurement, tags, fields) {
-    var body = makeBody(measurement, tags, fields);
+function sendToVM(body) {
     try {
         HttpClient.POST(VM_SERVER)
             .header('Content-Type', 'text/plain; charset=utf-8')
@@ -137,8 +143,7 @@ function writeToVM(measurement, tags, fields) {
     }
 }
 
-function writeToInfluxDB(measurement, tags, fields) {
-    var body = makeBody(measurement, tags, fields);
+function sendToInfluxDB(body) {
     try {
         HttpClient.POST(INFLUX_SERVER)
             .header('Authorization', "Token " + INFLUX_TOKEN)
@@ -153,6 +158,14 @@ function writeToInfluxDB(measurement, tags, fields) {
     } catch(e) {
         log.error("InfluxDB write error: " + e.message);
     }
+}
+
+function writeToVM(measurement, tags, fields) {
+    sendToVM(makeBody(measurement, tags, fields));
+}
+
+function writeToInfluxDB(measurement, tags, fields) {
+    sendToInfluxDB(makeBody(measurement, tags, fields));
 }
 
 // ============================================================================
@@ -257,15 +270,52 @@ function sendCharToInfluxDB(chr) {
 
 function sendAllMetrics(options) {
     var list = getCharsList();
+    var lines = [];
 
     for (var i = 0; i < list.length; i++) {
         var chr = list[i];
-        if (ENABLE_VM) sendCharToVM(chr);
-        if (ENABLE_INFLUXDB) sendCharToInfluxDB(chr);
+        var data = getDataForMetrics(chr);
+        lines.push(makeBody(MEASUREMENT, data.tags, data.fields));
+    }
+
+    if (lines.length > 0) {
+        if (ENABLE_VM) writeBatchToVM(lines);
+        if (ENABLE_INFLUXDB) writeBatchToInfluxDB(lines);
     }
 
     if (options && options.ShowDebugLog) {
         log.info("Metrics: Sent " + list.length + " metrics to databases");
+    }
+}
+
+// ============================================================================
+// SECTION 7.1: BATCH FUNCTIONS
+// ============================================================================
+
+function writeBatchToVM(lines) {
+    sendToVM(lines.join("\n"));
+}
+
+function writeBatchToInfluxDB(lines) {
+    sendToInfluxDB(lines.join("\n"));
+}
+
+function addToBatch(measurement, tags, fields) {
+    var line = makeBody(measurement, tags, fields);
+    _cronVariables.batch.push(line);
+}
+
+function flushBatch() {
+    var count = _cronVariables.batch.length;
+    if (count === 0) return;
+
+    if (ENABLE_VM) writeBatchToVM(_cronVariables.batch);
+    if (ENABLE_INFLUXDB) writeBatchToInfluxDB(_cronVariables.batch);
+
+    _cronVariables.batch = [];
+
+    if (BATCH_SHOW_LOG) {
+        log.info("Metrics: Flushed batch - " + count + " metrics");
     }
 }
 
@@ -331,6 +381,19 @@ function initCronJobs(options) {
     } else {
         log.info("Metrics: Health check disabled");
     }
+
+    // Инициализация батчинга
+    if (_cronVariables.batchTask) {
+        clear(_cronVariables.batchTask);
+        _cronVariables.batchTask = null;
+    }
+
+    if (ENABLE_BATCH_MODE) {
+        _cronVariables.batchTask = setInterval(function() {
+            flushBatch();
+        }, BATCH_INTERVAL_MS);
+        log.info("Metrics: Batch mode enabled, flush every " + BATCH_INTERVAL_MS + "ms");
+    }
 }
 
 // ============================================================================
@@ -353,6 +416,11 @@ function trigger(source, value, variables, options) {
         if (_cronVariables.healthCheckTask) {
             try { clear(_cronVariables.healthCheckTask); } catch(e) {}
         }
+        if (_cronVariables.batchTask) {
+            try { clear(_cronVariables.batchTask); } catch(e) {}
+        }
+        // Очищаем буфер батчей при перезагрузке
+        _cronVariables.batch = [];
 
         initCronJobs(options);
         refreshCharsList(options);
@@ -362,8 +430,14 @@ function trigger(source, value, variables, options) {
 
     var data = getDataForMetrics(source, value);
 
-    if (ENABLE_VM) writeToVM(MEASUREMENT, data.tags, data.fields);
-    if (ENABLE_INFLUXDB) writeToInfluxDB(MEASUREMENT, data.tags, data.fields);
+    if (ENABLE_BATCH_MODE) {
+        // Батчинг: накапливаем и отправляем раз в BATCH_INTERVAL_MS
+        addToBatch(MEASUREMENT, data.tags, data.fields);
+    } else {
+        // Текущее поведение: отправляем сразу
+        if (ENABLE_VM) writeToVM(MEASUREMENT, data.tags, data.fields);
+        if (ENABLE_INFLUXDB) writeToInfluxDB(MEASUREMENT, data.tags, data.fields);
+    }
 
     if (options.ShowDebugLog) {
         log.info("Metrics: " + source.getService().getName() + " in " + source.getAccessory().getRoom().getName() + " = " + value);
@@ -495,6 +569,7 @@ var MockHttpClient = {
 
 function resetTestState() {
     httpRequests = [];
+    _cronVariables.batch = [];
 }
 
 function runTests() {
@@ -606,6 +681,67 @@ function runTests() {
         assertEquals(httpRequests.length, 1, "sendCharToInfluxDB: should make one HTTP request");
 
         log.info("Metrics Tests: sendCharToVM/sendCharToInfluxDB - OK");
+
+        // ==================== TEST: addToBatch ====================
+        log.info("Metrics Tests: Test addToBatch()");
+
+        resetTestState();
+
+        addToBatch("sensors", "room=Test", "value=1");
+        addToBatch("sensors", "room=Test2", "value=2");
+
+        assertEquals(_cronVariables.batch.length, 2, "addToBatch: should add to batch");
+        assertTrue(_cronVariables.batch[0].indexOf("sensors,room=Test") >= 0, "addToBatch: batch should contain line protocol");
+        assertTrue(_cronVariables.batch[1].indexOf("room=Test2") >= 0, "addToBatch: batch should contain second entry");
+
+        log.info("Metrics Tests: addToBatch() - OK");
+
+        // ==================== TEST: flushBatch ====================
+        log.info("Metrics Tests: Test flushBatch()");
+
+        // Batch already has 2 items from previous test
+        flushBatch();
+
+        assertEquals(httpRequests.length, 2, "flushBatch: should make two HTTP requests (VM + InfluxDB)");
+        assertEquals(_cronVariables.batch.length, 0, "flushBatch: should clear batch");
+
+        // Verify batch body contains multiple lines
+        var vmRequest = httpRequests[0];
+        var influxRequest = httpRequests[1];
+        assertTrue(vmRequest.bodyContent.indexOf("\n") > 0, "flushBatch: VM request should contain multiple lines");
+        assertTrue(influxRequest.bodyContent.indexOf("\n") > 0, "flushBatch: InfluxDB request should contain multiple lines");
+
+        log.info("Metrics Tests: flushBatch() - OK");
+
+        // ==================== TEST: flushBatch with empty buffer ====================
+        log.info("Metrics Tests: Test flushBatch() with empty buffer");
+
+        resetTestState();
+
+        flushBatch();
+
+        assertEquals(httpRequests.length, 0, "flushBatch: should not make requests with empty buffers");
+
+        log.info("Metrics Tests: flushBatch() with empty buffer - OK");
+
+        // ==================== TEST: writeBatchToVM / writeBatchToInfluxDB ====================
+        log.info("Metrics Tests: Test writeBatchToVM/writeBatchToInfluxDB");
+
+        resetTestState();
+
+        var testLines = ["sensors,room=A value=1 123", "sensors,room=B value=2 456"];
+
+        writeBatchToVM(testLines);
+        assertEquals(httpRequests.length, 1, "writeBatchToVM: should make one HTTP request");
+        assertEquals(httpRequests[0].bodyContent, "sensors,room=A value=1 123\nsensors,room=B value=2 456", "writeBatchToVM: body should be lines joined with newline");
+
+        resetTestState();
+
+        writeBatchToInfluxDB(testLines);
+        assertEquals(httpRequests.length, 1, "writeBatchToInfluxDB: should make one HTTP request");
+        assertEquals(httpRequests[0].bodyContent, "sensors,room=A value=1 123\nsensors,room=B value=2 456", "writeBatchToInfluxDB: body should be lines joined with newline");
+
+        log.info("Metrics Tests: writeBatchToVM/writeBatchToInfluxDB - OK");
 
         // ==================== FINISH ====================
         log.info("Metrics Tests: ALL TESTS PASSED!");
