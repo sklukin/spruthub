@@ -15,7 +15,8 @@ var _cronVariables = {
     healthCheckTask: null,
     charsList: null,
     batch: [],          // массив строк Line Protocol для батчинга
-    batchTask: null     // задача setInterval для flush
+    batchTask: null,    // задача setInterval для flush
+    lastHealthStatus: { vm: true, influx: true }  // для дедупликации уведомлений
 };
 
 // ============================================================================
@@ -28,8 +29,8 @@ const ENABLE_INFLUXDB = true;
 
 // Батчинг метрик в trigger()
 const ENABLE_BATCH_MODE = true;  // false = текущее поведение, true = батчинг
-const BATCH_INTERVAL_MS = 10000;  // 10 секунд (только при ENABLE_BATCH_MODE = true)
-const BATCH_SHOW_LOG = false; // Логировать отправку батчей
+const BATCH_INTERVAL_MS = 30000;  // 30 секунд (только при ENABLE_BATCH_MODE = true)
+const BATCH_SHOW_LOG = true; // Логировать отправку батчей
 
 // VictoriaMetrics configuration
 const VM_SERVER = 'http://192.168.1.68:8428';
@@ -101,7 +102,8 @@ info = {
     sourceCharacteristics: MONITORED_CHARACTERISTICS,
 
     variables: {
-        active: true
+        active: true,
+        showDebugLog: false
     },
 
     options: {
@@ -120,10 +122,23 @@ info = {
 // SECTION 3: LINE PROTOCOL FORMATTING
 // ============================================================================
 
-function makeBody(measurement, tags, fields) {
-    var fields_replaced = fields.replace(/\s/g, '-');
-    var tags_replaced = tags.replace(/\s/g, '-');
-    return measurement + "," + tags_replaced + " " + fields_replaced + " " + Date.now();
+function escapeTagValue(val) {
+    var str = String(val);
+    return str.replace(/\s/g, '-').replace(/,/g, '\\,').replace(/=/g, '\\=');
+}
+
+function buildMetricLine(chr, valueOverride) {
+    var service = chr.getService();
+    var accessory = service.getAccessory();
+    var value = (valueOverride !== undefined) ? valueOverride : chr.getValue();
+
+    var tags = "room=" + escapeTagValue(accessory.getRoom().getName()) +
+        ",accessory=" + escapeTagValue(accessory.getName()) +
+        ",type=" + escapeTagValue(service.getType()) +
+        ",service=" + escapeTagValue(service.getName()) +
+        ",chrType=" + escapeTagValue(chr.getType());
+
+    return MEASUREMENT + "," + tags + " value=" + value + " " + Date.now();
 }
 
 // ============================================================================
@@ -137,6 +152,7 @@ function sendToVM(body) {
             .header('Accept', 'application/json')
             .path('api/v2/write')
             .body(body)
+            .timeout(5000, 5000)
             .send();
     } catch(e) {
         log.error("VM write error: " + e.message);
@@ -154,38 +170,11 @@ function sendToInfluxDB(body) {
             .queryString('bucket', INFLUX_BUCKET)
             .queryString('precision', 'ms')
             .body(body)
+            .timeout(5000, 5000)
             .send();
     } catch(e) {
         log.error("InfluxDB write error: " + e.message);
     }
-}
-
-function writeToVM(measurement, tags, fields) {
-    sendToVM(makeBody(measurement, tags, fields));
-}
-
-function writeToInfluxDB(measurement, tags, fields) {
-    sendToInfluxDB(makeBody(measurement, tags, fields));
-}
-
-// ============================================================================
-// SECTION 5: DATA EXTRACTION
-// ============================================================================
-
-function getDataForMetrics(chr, valueOverride) {
-    var service = chr.getService();
-    var chrType = chr.getType();
-    var serviceName = service.getName();
-    var serviceType = service.getType();
-    var accessory = service.getAccessory();
-    var accessoryName = accessory.getName();
-    var roomName = accessory.getRoom().getName();
-    var value = (valueOverride !== undefined) ? valueOverride : chr.getValue();
-
-    return {
-        tags: "room=" + roomName + ",accessory=" + accessoryName + ",type=" + serviceType + ",service=" + serviceName + ",chrType=" + chrType,
-        fields: "value=" + value
-    };
 }
 
 // ES5-совместимая проверка типа характеристики
@@ -258,24 +247,12 @@ function refreshCharsList(options) {
 // SECTION 7: SEND FUNCTIONS
 // ============================================================================
 
-function sendCharToVM(chr) {
-    var data = getDataForMetrics(chr);
-    writeToVM(MEASUREMENT, data.tags, data.fields);
-}
-
-function sendCharToInfluxDB(chr) {
-    var data = getDataForMetrics(chr);
-    writeToInfluxDB(MEASUREMENT, data.tags, data.fields);
-}
-
 function sendAllMetrics(options) {
     var list = getCharsList();
     var lines = [];
 
     for (var i = 0; i < list.length; i++) {
-        var chr = list[i];
-        var data = getDataForMetrics(chr);
-        lines.push(makeBody(MEASUREMENT, data.tags, data.fields));
+        lines.push(buildMetricLine(list[i]));
     }
 
     if (lines.length > 0) {
@@ -300,22 +277,20 @@ function writeBatchToInfluxDB(lines) {
     sendToInfluxDB(lines.join("\n"));
 }
 
-function addToBatch(measurement, tags, fields) {
-    var line = makeBody(measurement, tags, fields);
+function addToBatch(line) {
     _cronVariables.batch.push(line);
 }
 
 function flushBatch() {
-    var count = _cronVariables.batch.length;
-    if (count === 0) return;
-
-    if (ENABLE_VM) writeBatchToVM(_cronVariables.batch);
-    if (ENABLE_INFLUXDB) writeBatchToInfluxDB(_cronVariables.batch);
-
+    var lines = _cronVariables.batch;
+    if (lines.length === 0) return;
     _cronVariables.batch = [];
 
+    if (ENABLE_VM) writeBatchToVM(lines);
+    if (ENABLE_INFLUXDB) writeBatchToInfluxDB(lines);
+
     if (BATCH_SHOW_LOG) {
-        log.info("Metrics: Flushed batch - " + count + " metrics");
+        log.info("Metrics: Flushed batch - " + lines.length + " metrics");
     }
 }
 
@@ -334,20 +309,21 @@ function validateCron(expr, defaultExpr) {
     return expr;
 }
 
+var _taskKeys = ['metricsTask', 'refreshTask', 'healthCheckTask', 'batchTask'];
+
+function clearAllTasks() {
+    for (var i = 0; i < _taskKeys.length; i++) {
+        var key = _taskKeys[i];
+        if (_cronVariables[key]) {
+            try { clear(_cronVariables[key]); } catch(e) {}
+            _cronVariables[key] = null;
+        }
+    }
+}
+
 function initCronJobs(options) {
     // Отменяем существующие задачи
-    if (_cronVariables.metricsTask) {
-        clear(_cronVariables.metricsTask);
-        _cronVariables.metricsTask = null;
-    }
-    if (_cronVariables.refreshTask) {
-        clear(_cronVariables.refreshTask);
-        _cronVariables.refreshTask = null;
-    }
-    if (_cronVariables.healthCheckTask) {
-        clear(_cronVariables.healthCheckTask);
-        _cronVariables.healthCheckTask = null;
-    }
+    clearAllTasks();
 
     // Проверяем, выбрана ли хотя бы одна база данных
     if (!ENABLE_VM && !ENABLE_INFLUXDB) {
@@ -383,11 +359,6 @@ function initCronJobs(options) {
     }
 
     // Инициализация батчинга
-    if (_cronVariables.batchTask) {
-        clear(_cronVariables.batchTask);
-        _cronVariables.batchTask = null;
-    }
-
     if (ENABLE_BATCH_MODE) {
         _cronVariables.batchTask = setInterval(function() {
             flushBatch();
@@ -406,40 +377,24 @@ function trigger(source, value, variables, options) {
         // Сразу ставим версию, чтобы избежать повторной инициализации
         _lastInitVersion = SCRIPT_VERSION;
 
-        // Очищаем старые cron-задачи при перезагрузке
-        if (_cronVariables.metricsTask) {
-            try { clear(_cronVariables.metricsTask); } catch(e) {}
-        }
-        if (_cronVariables.refreshTask) {
-            try { clear(_cronVariables.refreshTask); } catch(e) {}
-        }
-        if (_cronVariables.healthCheckTask) {
-            try { clear(_cronVariables.healthCheckTask); } catch(e) {}
-        }
-        if (_cronVariables.batchTask) {
-            try { clear(_cronVariables.batchTask); } catch(e) {}
-        }
-        // Очищаем буфер батчей при перезагрузке
         _cronVariables.batch = [];
-
         initCronJobs(options);
         refreshCharsList(options);
     }
 
-    if (!value) return;
+    if (value === null || value === undefined) return;
 
-    var data = getDataForMetrics(source, value);
+    var line = buildMetricLine(source, value);
 
     if (ENABLE_BATCH_MODE) {
-        // Батчинг: накапливаем и отправляем раз в BATCH_INTERVAL_MS
-        addToBatch(MEASUREMENT, data.tags, data.fields);
+        addToBatch(line);
     } else {
-        // Текущее поведение: отправляем сразу
-        if (ENABLE_VM) writeToVM(MEASUREMENT, data.tags, data.fields);
-        if (ENABLE_INFLUXDB) writeToInfluxDB(MEASUREMENT, data.tags, data.fields);
+        if (ENABLE_VM) sendToVM(line);
+        if (ENABLE_INFLUXDB) sendToInfluxDB(line);
     }
 
-    if (options.ShowDebugLog) {
+    variables.showDebugLog = options.ShowDebugLog;
+    if (variables.showDebugLog) {
         log.info("Metrics: " + source.getService().getName() + " in " + source.getAccessory().getRoom().getName() + " = " + value);
     }
 }
@@ -500,21 +455,39 @@ function checkConnectivity() {
 
 function runHealthCheckWithNotification() {
     var result = checkConnectivity();
+    var prev = _cronVariables.lastHealthStatus;
     var errors = [];
+    var recovered = [];
 
-    if (ENABLE_VM && !result.vm) {
-        errors.push("VictoriaMetrics (" + VM_SERVER + ")");
+    if (ENABLE_VM) {
+        if (!result.vm && prev.vm) errors.push("VictoriaMetrics (" + VM_SERVER + ")");
+        if (result.vm && !prev.vm) recovered.push("VictoriaMetrics (" + VM_SERVER + ")");
     }
-    if (ENABLE_INFLUXDB && !result.influx) {
-        errors.push("InfluxDB (" + INFLUX_SERVER + ")");
+    if (ENABLE_INFLUXDB) {
+        if (!result.influx && prev.influx) errors.push("InfluxDB (" + INFLUX_SERVER + ")");
+        if (result.influx && !prev.influx) recovered.push("InfluxDB (" + INFLUX_SERVER + ")");
     }
 
-    if (errors.length > 0) {
-        var message = "SprutHub Metrics Alert\n\n" +
-            "Недоступны базы данных:\n" +
-            errors.join("\n") + "\n\n" +
+    _cronVariables.lastHealthStatus = { vm: result.vm, influx: result.influx };
+
+    var message = null;
+
+    if (errors.length > 0 && recovered.length > 0) {
+        message = "SprutHub Metrics Alert\n\n" +
+            "Недоступны базы данных:\n" + errors.join("\n") + "\n\n" +
+            "Восстановлены базы данных:\n" + recovered.join("\n") + "\n\n" +
             "Время: " + new Date().toLocaleString();
+    } else if (errors.length > 0) {
+        message = "SprutHub Metrics Alert\n\n" +
+            "Недоступны базы данных:\n" + errors.join("\n") + "\n\n" +
+            "Время: " + new Date().toLocaleString();
+    } else if (recovered.length > 0) {
+        message = "SprutHub Metrics Recovery\n\n" +
+            "Восстановлены базы данных:\n" + recovered.join("\n") + "\n\n" +
+            "Время: " + new Date().toLocaleString();
+    }
 
+    if (message) {
         try {
             global.sendToTelegram(message);
             log.info("Metrics: Telegram notification sent");
@@ -532,44 +505,64 @@ function runHealthCheckWithNotification() {
 
 var httpRequests = [];
 
+var mockGetStatus = 200;
+
+function createMockRequest(method, url) {
+    var request = {
+        method: method,
+        url: url,
+        headers: {},
+        pathSegment: "",
+        queryParams: {},
+        bodyContent: null,
+        timeoutConnect: null,
+        timeoutRead: null
+    };
+
+    return {
+        header: function(name, value) {
+            request.headers[name] = value;
+            return this;
+        },
+        path: function(segment) {
+            request.pathSegment = segment;
+            return this;
+        },
+        queryString: function(name, value) {
+            request.queryParams[name] = value;
+            return this;
+        },
+        body: function(content) {
+            request.bodyContent = content;
+            return this;
+        },
+        timeout: function(connect, read) {
+            request.timeoutConnect = connect;
+            request.timeoutRead = read;
+            return this;
+        },
+        send: function() {
+            httpRequests.push(request);
+            var status = mockGetStatus;
+            return { getStatus: function() { return status; } };
+        }
+    };
+}
+
 var MockHttpClient = {
     POST: function(url) {
-        var request = {
-            url: url,
-            headers: {},
-            pathSegment: "",
-            queryParams: {},
-            bodyContent: null
-        };
-
-        return {
-            header: function(name, value) {
-                request.headers[name] = value;
-                return this;
-            },
-            path: function(segment) {
-                request.pathSegment = segment;
-                return this;
-            },
-            queryString: function(name, value) {
-                request.queryParams[name] = value;
-                return this;
-            },
-            body: function(content) {
-                request.bodyContent = content;
-                return this;
-            },
-            send: function() {
-                httpRequests.push(request);
-                return { getStatus: function() { return 200; } };
-            }
-        };
+        return createMockRequest("POST", url);
+    },
+    GET: function(url) {
+        return createMockRequest("GET", url);
     }
 };
 
 function resetTestState() {
     httpRequests = [];
+    mockGetStatus = 200;
     _cronVariables.batch = [];
+    _cronVariables.lastHealthStatus = { vm: true, influx: true };
 }
 
 function runTests() {
@@ -590,33 +583,8 @@ function runTests() {
 
         log.info("Metrics Tests: Starting...");
 
-        // ==================== TEST: makeBody ====================
-        log.info("Metrics Tests: Test makeBody()");
-
-        var body = makeBody("sensors", "room=Kitchen,type=Temp", "value=22.5");
-
-        assertTrue(body.indexOf("sensors,") === 0, "makeBody: should start with measurement");
-        assertTrue(body.indexOf("room=Kitchen") > 0, "makeBody: should contain tags");
-        assertTrue(body.indexOf("value=22.5") > 0, "makeBody: should contain fields");
-
-        // Check space replacement
-        var bodyWithSpaces = makeBody("sensors", "room=Living Room", "value=20");
-        assertTrue(bodyWithSpaces.indexOf("Living-Room") > 0, "makeBody: should replace spaces with dashes");
-
-        log.info("Metrics Tests: makeBody() - OK");
-
-        // ==================== TEST: isMonitoredCharacteristic ====================
-        log.info("Metrics Tests: Test isMonitoredCharacteristic()");
-
-        assertTrue(isMonitoredCharacteristic(HC.CurrentTemperature), "isMonitoredCharacteristic: temperature should be monitored");
-        assertTrue(isMonitoredCharacteristic(HC.CurrentRelativeHumidity), "isMonitoredCharacteristic: humidity should be monitored");
-        assertTrue(isMonitoredCharacteristic(HC.CarbonDioxideLevel), "isMonitoredCharacteristic: CO2 should be monitored");
-        assertFalse(isMonitoredCharacteristic(HC.On), "isMonitoredCharacteristic: On should not be monitored");
-
-        log.info("Metrics Tests: isMonitoredCharacteristic() - OK");
-
-        // ==================== TEST: getDataForMetrics ====================
-        log.info("Metrics Tests: Test getDataForMetrics()");
+        // ==================== TEST: buildMetricLine ====================
+        log.info("Metrics Tests: Test buildMetricLine()");
 
         var testAccessory = global.createUnitTestFullAccessory({
             id: 1,
@@ -633,62 +601,59 @@ function runTests() {
         });
 
         var chr = testAccessory.getService(HS.TemperatureSensor).getCharacteristic(HC.CurrentTemperature);
-        var data = getDataForMetrics(chr);
+        var line = buildMetricLine(chr);
 
-        assertNotNull(data.tags, "getDataForMetrics: should return tags");
-        assertNotNull(data.fields, "getDataForMetrics: should return fields");
-        assertTrue(data.tags.indexOf("room=Kitchen") >= 0, "getDataForMetrics: tags should contain room");
-        assertTrue(data.tags.indexOf("accessory=Test Sensor") >= 0, "getDataForMetrics: tags should contain accessory");
-        assertEquals(data.fields, "value=23.5", "getDataForMetrics: fields should be formatted correctly");
+        assertTrue(line.indexOf(MEASUREMENT + ",") === 0, "buildMetricLine: should start with measurement");
+        assertTrue(line.indexOf("room=Kitchen") > 0, "buildMetricLine: should contain room tag");
+        assertTrue(line.indexOf("accessory=Test-Sensor") > 0, "buildMetricLine: should escape spaces in accessory name");
+        assertTrue(line.indexOf("value=23.5") > 0, "buildMetricLine: should contain value field");
 
-        log.info("Metrics Tests: getDataForMetrics() - OK");
+        var lineOverride = buildMetricLine(chr, 99);
+        assertTrue(lineOverride.indexOf("value=99") > 0, "buildMetricLine: valueOverride should take precedence");
+
+        log.info("Metrics Tests: buildMetricLine() - OK");
+
+        // ==================== TEST: isMonitoredCharacteristic ====================
+        log.info("Metrics Tests: Test isMonitoredCharacteristic()");
+
+        assertTrue(isMonitoredCharacteristic(HC.CurrentTemperature), "isMonitoredCharacteristic: temperature should be monitored");
+        assertTrue(isMonitoredCharacteristic(HC.CurrentRelativeHumidity), "isMonitoredCharacteristic: humidity should be monitored");
+        assertTrue(isMonitoredCharacteristic(HC.CarbonDioxideLevel), "isMonitoredCharacteristic: CO2 should be monitored");
+        assertFalse(isMonitoredCharacteristic(HC.On), "isMonitoredCharacteristic: On should not be monitored");
+
+        log.info("Metrics Tests: isMonitoredCharacteristic() - OK");
 
         // ==================== TEST: HTTP requests format ====================
         log.info("Metrics Tests: Test HTTP request formatting");
 
         resetTestState();
 
-        writeToVM("sensors", "room=Test", "value=1");
+        sendToVM("sensors,room=Test value=1 123");
 
-        assertEquals(httpRequests.length, 1, "writeToVM: should make one HTTP request");
-        assertEquals(httpRequests[0].url, VM_SERVER, "writeToVM: should use VM server");
-        assertEquals(httpRequests[0].pathSegment, "api/v2/write", "writeToVM: should use correct path");
-        assertTrue(httpRequests[0].bodyContent.indexOf("sensors,room=Test") >= 0, "writeToVM: body should be line protocol");
+        assertEquals(httpRequests.length, 1, "sendToVM: should make one HTTP request");
+        assertEquals(httpRequests[0].url, VM_SERVER, "sendToVM: should use VM server");
+        assertEquals(httpRequests[0].pathSegment, "api/v2/write", "sendToVM: should use correct path");
+        assertTrue(httpRequests[0].bodyContent.indexOf("sensors,room=Test") >= 0, "sendToVM: body should be line protocol");
 
         resetTestState();
 
-        writeToInfluxDB("sensors", "room=Test", "value=2");
+        sendToInfluxDB("sensors,room=Test value=2 123");
 
-        assertEquals(httpRequests.length, 1, "writeToInfluxDB: should make one HTTP request");
-        assertEquals(httpRequests[0].url, INFLUX_SERVER, "writeToInfluxDB: should use InfluxDB server");
-        assertEquals(httpRequests[0].queryParams.org, INFLUX_ORG, "writeToInfluxDB: should set org param");
-        assertEquals(httpRequests[0].queryParams.bucket, INFLUX_BUCKET, "writeToInfluxDB: should set bucket param");
-        assertEquals(httpRequests[0].headers['Authorization'], "Token " + INFLUX_TOKEN, "writeToInfluxDB: should set auth header");
+        assertEquals(httpRequests.length, 1, "sendToInfluxDB: should make one HTTP request");
+        assertEquals(httpRequests[0].url, INFLUX_SERVER, "sendToInfluxDB: should use InfluxDB server");
+        assertEquals(httpRequests[0].queryParams.org, INFLUX_ORG, "sendToInfluxDB: should set org param");
+        assertEquals(httpRequests[0].queryParams.bucket, INFLUX_BUCKET, "sendToInfluxDB: should set bucket param");
+        assertEquals(httpRequests[0].headers['Authorization'], "Token " + INFLUX_TOKEN, "sendToInfluxDB: should set auth header");
 
         log.info("Metrics Tests: HTTP request formatting - OK");
-
-        // ==================== TEST: sendCharToVM / sendCharToInfluxDB ====================
-        log.info("Metrics Tests: Test sendCharToVM/sendCharToInfluxDB");
-
-        resetTestState();
-
-        sendCharToVM(chr);
-        assertEquals(httpRequests.length, 1, "sendCharToVM: should make one HTTP request");
-
-        resetTestState();
-
-        sendCharToInfluxDB(chr);
-        assertEquals(httpRequests.length, 1, "sendCharToInfluxDB: should make one HTTP request");
-
-        log.info("Metrics Tests: sendCharToVM/sendCharToInfluxDB - OK");
 
         // ==================== TEST: addToBatch ====================
         log.info("Metrics Tests: Test addToBatch()");
 
         resetTestState();
 
-        addToBatch("sensors", "room=Test", "value=1");
-        addToBatch("sensors", "room=Test2", "value=2");
+        addToBatch("sensors,room=Test value=1 123");
+        addToBatch("sensors,room=Test2 value=2 456");
 
         assertEquals(_cronVariables.batch.length, 2, "addToBatch: should add to batch");
         assertTrue(_cronVariables.batch[0].indexOf("sensors,room=Test") >= 0, "addToBatch: batch should contain line protocol");
@@ -742,6 +707,131 @@ function runTests() {
         assertEquals(httpRequests[0].bodyContent, "sensors,room=A value=1 123\nsensors,room=B value=2 456", "writeBatchToInfluxDB: body should be lines joined with newline");
 
         log.info("Metrics Tests: writeBatchToVM/writeBatchToInfluxDB - OK");
+
+        // ==================== TEST: isExcludedRoom ====================
+        log.info("Metrics Tests: Test isExcludedRoom()");
+
+        assertTrue(isExcludedRoom("Дом"), "isExcludedRoom: 'Дом' should be excluded");
+        assertFalse(isExcludedRoom("Kitchen"), "isExcludedRoom: 'Kitchen' should not be excluded");
+        assertFalse(isExcludedRoom(""), "isExcludedRoom: empty string should not be excluded");
+
+        log.info("Metrics Tests: isExcludedRoom() - OK");
+
+        // ==================== TEST: validateCron ====================
+        log.info("Metrics Tests: Test validateCron()");
+
+        assertEquals(validateCron("0 0 * * * *", "default"), "0 0 * * * *", "validateCron: valid 6-field cron should be returned as-is");
+        assertEquals(validateCron("0 * * * *", "0 0 * * * *"), "0 0 * * * *", "validateCron: 5-field cron should return default");
+        assertEquals(validateCron("", "0 0 * * * *"), "0 0 * * * *", "validateCron: empty string should return default");
+        assertEquals(validateCron(null, "0 0 * * * *"), "0 0 * * * *", "validateCron: null should return default");
+
+        log.info("Metrics Tests: validateCron() - OK");
+
+        // ==================== TEST: escapeTagValue ====================
+        log.info("Metrics Tests: Test escapeTagValue()");
+
+        assertEquals(escapeTagValue("Kitchen"), "Kitchen", "escapeTagValue: plain string should be unchanged");
+        assertEquals(escapeTagValue("Living Room"), "Living-Room", "escapeTagValue: spaces should become dashes");
+        assertEquals(escapeTagValue("a,b"), "a\\,b", "escapeTagValue: commas should be escaped");
+        assertEquals(escapeTagValue("a=b"), "a\\=b", "escapeTagValue: equals should be escaped");
+        assertEquals(escapeTagValue("Room 1, Floor=2"), "Room-1\\,-Floor\\=2", "escapeTagValue: mixed special chars");
+
+        log.info("Metrics Tests: escapeTagValue() - OK");
+
+        // ==================== TEST: trigger with value=0 ====================
+        log.info("Metrics Tests: Test trigger() with value=0");
+
+        resetTestState();
+
+        var triggerAccessory = global.createUnitTestFullAccessory({
+            id: 2,
+            name: "Power Meter",
+            room: "Kitchen",
+            services: [{
+                type: HS.C_WattMeter,
+                name: "Watt",
+                characteristics: [{
+                    type: HC.C_Watt,
+                    value: 0
+                }]
+            }]
+        });
+
+        var triggerChr = triggerAccessory.getService(HS.C_WattMeter).getCharacteristic(HC.C_Watt);
+
+        // Симулируем trigger с value=0 (не должен быть пропущен)
+        var triggerValue = 0;
+        if (triggerValue === null || triggerValue === undefined) {
+            assertTrue(false, "trigger: value=0 should NOT be skipped");
+        }
+        addToBatch(buildMetricLine(triggerChr, triggerValue));
+
+        assertEquals(_cronVariables.batch.length, 1, "trigger: value=0 should add to batch");
+        assertTrue(_cronVariables.batch[0].indexOf("value=0") >= 0, "trigger: batch should contain value=0");
+
+        log.info("Metrics Tests: trigger() with value=0 - OK");
+
+        // ==================== TEST: checkConnectivity ====================
+        log.info("Metrics Tests: Test checkConnectivity()");
+
+        resetTestState();
+
+        var connectResult = checkConnectivity();
+        assertTrue(connectResult.vm, "checkConnectivity: VM should be OK with status 200");
+        assertTrue(connectResult.influx, "checkConnectivity: InfluxDB should be OK with status 200");
+        assertTrue(httpRequests.length >= 2, "checkConnectivity: should make GET requests");
+        assertEquals(httpRequests[0].method, "GET", "checkConnectivity: should use GET method");
+        assertEquals(httpRequests[0].pathSegment, "health", "checkConnectivity: should check /health");
+
+        resetTestState();
+        mockGetStatus = 500;
+
+        var failResult = checkConnectivity();
+        assertFalse(failResult.vm, "checkConnectivity: VM should fail with status 500");
+        assertFalse(failResult.influx, "checkConnectivity: InfluxDB should fail with status 500");
+
+        log.info("Metrics Tests: checkConnectivity() - OK");
+
+        // ==================== TEST: health check deduplication ====================
+        log.info("Metrics Tests: Test health check deduplication");
+
+        resetTestState();
+        var telegramMessages = [];
+        var origSendToTelegram = global.sendToTelegram;
+        global.sendToTelegram = function(msg) { telegramMessages.push(msg); };
+
+        try {
+            // Состояние: всё OK (lastHealthStatus = {vm:true, influx:true}), результат OK
+            mockGetStatus = 200;
+            _cronVariables.lastHealthStatus = { vm: true, influx: true };
+            runHealthCheckWithNotification();
+            assertEquals(telegramMessages.length, 0, "healthCheck: no notification when status unchanged (OK→OK)");
+
+            // Состояние: было OK, стало FAIL
+            telegramMessages = [];
+            mockGetStatus = 500;
+            _cronVariables.lastHealthStatus = { vm: true, influx: true };
+            runHealthCheckWithNotification();
+            assertEquals(telegramMessages.length, 1, "healthCheck: should notify on OK→FAIL");
+            assertTrue(telegramMessages[0].indexOf("Недоступны") >= 0, "healthCheck: should contain failure message");
+
+            // Состояние: было FAIL, осталось FAIL — без уведомления
+            telegramMessages = [];
+            mockGetStatus = 500;
+            runHealthCheckWithNotification();
+            assertEquals(telegramMessages.length, 0, "healthCheck: no notification when status unchanged (FAIL→FAIL)");
+
+            // Состояние: было FAIL, стало OK — recovery
+            telegramMessages = [];
+            mockGetStatus = 200;
+            runHealthCheckWithNotification();
+            assertEquals(telegramMessages.length, 1, "healthCheck: should notify on FAIL→OK (recovery)");
+            assertTrue(telegramMessages[0].indexOf("Восстановлены") >= 0, "healthCheck: should contain recovery message");
+        } finally {
+            global.sendToTelegram = origSendToTelegram;
+        }
+
+        log.info("Metrics Tests: health check deduplication - OK");
 
         // ==================== FINISH ====================
         log.info("Metrics Tests: ALL TESTS PASSED!");
