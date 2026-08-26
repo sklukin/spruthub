@@ -1,0 +1,19 @@
+{
+  "folder": "SprutHub",
+  "folderUid": "spruthub",
+  "interval": "1m",
+  "service": "spruthub",
+  "groups": {
+    "spruthub-metrics": [
+      {
+        "uid": "spruthub-metrics-absent",
+        "title": "SprutHub: метрики датчиков не приходят",
+        "expr": "absent(sensors_value)",
+        "for": "10m",
+        "severity": "critical",
+        "summary": "В VictoriaMetrics 10 минут нет ни одной серии sensors_value",
+        "description": "Молчит logic/statisticsSensors.js: упал хаб, сценарий выключен или не доходит запрос до VictoriaMetrics. Собственный health check сценария такое не поймает — он умирает вместе с хабом."
+      }
+    ]
+  }
+}

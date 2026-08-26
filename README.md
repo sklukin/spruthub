@@ -60,6 +60,8 @@
 
 **Документация:** [docs/start.md](docs/start.md) | [Статья на sklukin.ru](https://sklukin.ru/posts/spruthub-grafana/)
 
+**Дашборды и алерты Grafana:** [grafana/](grafana/) — JSON в репозитории, заливка скриптами ([docs/grafana.md](docs/grafana.md))
+
 #### Быстрый старт
 
 ```bash
