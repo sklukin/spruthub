@@ -15,6 +15,7 @@
       }
     ]
   },
+  "description": "Те же датчики, но из базы InfluxDB. SprutHub пишет значения в обе базы одновременно: в InfluxDB (measurement sensors, 1.1 ГБ, история с февраля 2024) и в VictoriaMetrics (sensors_value, история примерно за два года). Дублирование стоит развязать — держать две базы под одни и те же цифры незачем. Управляется из репозитория sklukin/spruthub, каталог grafana/ — правки через UI перетрутся следующим деплоем.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -23,7 +24,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -113,7 +114,7 @@
           "alias": "$tag_room - $tag_service",
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -177,7 +178,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -291,7 +292,7 @@
           "alias": "$tag_room - $tag_service",
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -353,7 +354,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -478,7 +479,7 @@
           "alias": "$tag_room $tag_service",
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -552,7 +553,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -642,7 +643,7 @@
           "alias": "$tag_room $tag_service",
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -716,7 +717,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -806,7 +807,7 @@
           "alias": "$tag_room $tag_service",
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -880,7 +881,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -970,7 +971,7 @@
           "alias": "$tag_room $tag_service",
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -1046,7 +1047,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1136,7 +1137,7 @@
           "alias": "$tag_room $tag_service",
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -1204,7 +1205,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1294,7 +1295,7 @@
           "alias": "$tag_room $tag_service",
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -1356,7 +1357,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1446,7 +1447,7 @@
           "alias": "$tag_room $tag_service",
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -1540,7 +1541,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1630,7 +1631,7 @@
           "alias": "$tag_room $tag_service",
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -1700,7 +1701,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1837,7 +1838,7 @@
           "alias": "$tag_room $tag_service",
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -1911,7 +1912,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1999,7 +2000,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -2055,7 +2056,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2139,7 +2140,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -2189,7 +2190,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2298,7 +2299,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -2384,7 +2385,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2501,7 +2502,7 @@
           "alias": "$tag_room - $tag_service",
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -2563,7 +2564,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2647,7 +2648,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -2709,7 +2710,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2799,7 +2800,7 @@
           "alias": "$tag_room $tag_service",
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -2861,7 +2862,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "${DS}"
+        "uid": "${DS_INFLUX}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2951,7 +2952,7 @@
           "alias": "$tag_room $tag_service",
           "datasource": {
             "type": "influxdb",
-            "uid": "${DS}"
+            "uid": "${DS_INFLUX}"
           },
           "groupBy": [
             {
@@ -3024,23 +3025,24 @@
     }
   ],
   "preload": false,
-  "refresh": "5m",
+  "refresh": "15m",
   "schemaVersion": 42,
   "tags": [
-    "spruthub",
-    "sensors"
+    "copper",
+    "sensors",
+    "influxdb",
+    "homelab"
   ],
   "templating": {
     "list": [
       {
-        "type": "datasource",
-        "name": "DS",
-        "label": "Источник данных",
-        "query": "influxdb",
-        "current": {},
         "hide": 0,
+        "label": "Источник данных",
+        "name": "DS_INFLUX",
+        "query": "influxdb",
         "refresh": 1,
-        "regex": ""
+        "regex": "",
+        "type": "datasource"
       }
     ]
   },
@@ -3050,8 +3052,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Copper InfluxDB",
+  "title": "Copper: датчики дома (InfluxDB)",
   "uid": "be21ad33-9b25-4764-aace-e8bcb34562ad",
-  "weekStart": "",
-  "description": "Датчики SprutHub из InfluxDB (bucket sensors). Пишет logic/statisticsSensors.js. Управляется из репозитория sklukin/spruthub, каталог grafana/ — правки через UI перетрутся следующим деплоем."
+  "weekStart": ""
 }

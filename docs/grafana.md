@@ -9,8 +9,8 @@ JSON лежит в репозитории, в Grafana он заливается 
 ```
 grafana/
 ├── dashboards/
-│   ├── copper-influxdb.json     — дашборд «Copper InfluxDB»
-│   └── copper-prometheus.json   — дашборд «Copper Prometheus»
+│   ├── copper-influxdb.json     — «Copper: датчики дома (InfluxDB)»
+│   └── copper-prometheus.json   — «Copper: датчики дома (VictoriaMetrics)»
 ├── alerts/
 │   └── spruthub.json            — правила алертов
 ├── push.sh                      — заливка дашбордов
@@ -23,8 +23,8 @@ grafana/
 
 | Дашборд | Источник данных | Запросы |
 |---|---|---|
-| Copper InfluxDB | InfluxDB, bucket `sensors` | InfluxQL, `SELECT ... FROM "sensors"` |
-| Copper Prometheus | VictoriaMetrics | PromQL, метрика `sensors_value` |
+| Copper: датчики дома (InfluxDB) | InfluxDB, measurement `sensors` | InfluxQL, `SELECT ... FROM "sensors"` |
+| Copper: датчики дома (VictoriaMetrics) | VictoriaMetrics | PromQL, метрика `sensors_value` |
 
 InfluxDB держит короткую историю (~месяц) и удобен для разбора «что было вчера»,
 VictoriaMetrics — долгую (5 лет) и обслуживает годовые сравнения (`offset 1y` в панелях).
@@ -67,11 +67,16 @@ export GRAFANA_TOKEN=glsa_...
 
 ### Про `${DS}`
 
-Внутри JSON источник данных записан не uid'ом, а ссылкой на переменную дашборда: `"uid": "${DS}"`.
-Переменная `DS` объявлена первой в `templating.list`, её тип — `datasource`.
+Внутри JSON источник данных записан не uid'ом, а ссылкой на переменную дашборда:
+`"uid": "${DS}"` в prometheus-дашборде, `"uid": "${DS_INFLUX}"` в influxdb-дашборде.
+Сама переменная объявлена в `templating.list` с типом `datasource`.
 
-- при заливке через `push.sh` в `DS` подставляется uid из `DS_UID_<ТИП>`;
+- при заливке через `push.sh` в неё подставляется uid из `DS_UID_<ТИП>`;
 - при ручном импорте через UI Grafana сама спросит источник.
+
+Имя переменной значения не имеет — `push.sh` смотрит на **тип** источника (поле `query`
+у переменной: `prometheus` или `influxdb`) и по нему выбирает переменную окружения.
+Поэтому дашборд с двумя разными источниками тоже заработает, если объявить две переменные.
 
 Так один и тот же файл работает и в этой инсталляции, и у любого, кто скопирует дашборд себе.
 
@@ -191,8 +196,9 @@ jobs:
 `search.maxConcurrentRequests` по умолчанию равен удвоенному числу ядер, лишние запросы ждут
 в очереди `search.maxQueueDuration` (10 с) и получают 429. Дашборд на два десятка панелей
 выпускает запросы разом и упирается в потолок. Лечится с двух сторон: флаг
-`--search.maxConcurrentRequests=64` контейнеру VictoriaMetrics и `refresh` пореже
-(в `copper-prometheus.json` стоит `15m`, в `copper-influxdb.json` — `5m`).
+`--search.maxConcurrentRequests=64` контейнеру VictoriaMetrics и `refresh: 15m` в обоих
+дашбордах плюс свёрнутые строки — панели внутри свёрнутой строки Grafana не опрашивает
+вовсе. В `copper-prometheus.json` открыт только «Обзор», остальные пять строк свёрнуты.
 
 **Дашборд `Copper Prometheus 2`** в Grafana есть, но в репозиторий не взят: это черновик
 на одну панель. Понадобится — выгрузить тем же curl'ом.
