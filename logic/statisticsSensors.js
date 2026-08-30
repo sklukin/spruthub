@@ -11,9 +11,7 @@ var _lastInitVersion = 0;
 // Cron-задачи (общие для всех триггеров)
 var _cronVariables = {
     metricsTask: null,
-    refreshTask: null,
     healthCheckTask: null,
-    charsList: null,
     batch: [],          // массив строк Line Protocol для батчинга
     batchTask: null,    // задача setInterval для flush
     lastHealthStatus: { vm: true, influx: true }  // для дедупликации уведомлений
@@ -31,6 +29,7 @@ const ENABLE_INFLUXDB = true;
 const ENABLE_BATCH_MODE = true;  // false = текущее поведение, true = батчинг
 const BATCH_INTERVAL_MS = 30000;  // 30 секунд (только при ENABLE_BATCH_MODE = true)
 const BATCH_SHOW_LOG = true; // Логировать отправку батчей
+const MAX_BATCH_LINES = 2000;  // защита от OOM: flush при переполнении, если БД недоступна
 
 // VictoriaMetrics configuration
 const VM_SERVER = 'http://192.168.1.68:8428';
@@ -52,7 +51,6 @@ const EXCLUDED_ROOMS = [
 // Настройки периодической отправки метрик
 const ENABLE_PERIODIC_SEND = true;
 const CRON_SCHEDULE = "0 0 * * * *";           // Раз в час
-const REFRESH_INTERVAL = "0 * * * * *";         // Раз в минуту
 
 // Настройки проверки доступности баз данных
 const ENABLE_HEALTH_CHECK = true;
@@ -188,7 +186,7 @@ function isMonitoredCharacteristic(chrType) {
 }
 
 // ============================================================================
-// SECTION 6: CHARACTERISTIC COLLECTION
+// SECTION 6: PERIODIC SNAPSHOT
 // ============================================================================
 
 // ES5-совместимая проверка исключённой комнаты
@@ -201,8 +199,14 @@ function isExcludedRoom(roomName) {
     return false;
 }
 
-function buildCharsList() {
-    var list = [];
+// ============================================================================
+// SECTION 7: SEND FUNCTIONS
+// ============================================================================
+
+// ponytail: список характеристик не кэшируется — обход хаба раз в час дешевле,
+// чем постоянно живой массив ссылок на весь граф устройств (лимит сценария 64 МБ)
+function sendAllMetrics(options) {
+    var lines = [];
     var accessories = Hub.getAccessories();
 
     for (var i = 0; i < accessories.length; i++) {
@@ -213,46 +217,14 @@ function buildCharsList() {
 
         var services = accessory.getServices();
         for (var j = 0; j < services.length; j++) {
-            var service = services[j];
-            var chars = service.getCharacteristics();
+            var chars = services[j].getCharacteristics();
 
             for (var k = 0; k < chars.length; k++) {
-                var ch = chars[k];
-                if (isMonitoredCharacteristic(ch.getType())) {
-                    list.push(ch);
+                if (isMonitoredCharacteristic(chars[k].getType())) {
+                    lines.push(buildMetricLine(chars[k]));
                 }
             }
         }
-    }
-
-    return list;
-}
-
-function getCharsList() {
-    if (!_cronVariables.charsList || _cronVariables.charsList.length === 0) {
-        _cronVariables.charsList = buildCharsList();
-    }
-    return _cronVariables.charsList;
-}
-
-function refreshCharsList(options) {
-    _cronVariables.charsList = buildCharsList();
-
-    if (options && options.ShowDebugLog) {
-        log.info("Metrics: Device list refreshed, " + _cronVariables.charsList.length + " characteristics");
-    }
-}
-
-// ============================================================================
-// SECTION 7: SEND FUNCTIONS
-// ============================================================================
-
-function sendAllMetrics(options) {
-    var list = getCharsList();
-    var lines = [];
-
-    for (var i = 0; i < list.length; i++) {
-        lines.push(buildMetricLine(list[i]));
     }
 
     if (lines.length > 0) {
@@ -261,7 +233,7 @@ function sendAllMetrics(options) {
     }
 
     if (options && options.ShowDebugLog) {
-        log.info("Metrics: Sent " + list.length + " metrics to databases");
+        log.info("Metrics: Sent " + lines.length + " metrics to databases");
     }
 }
 
@@ -279,6 +251,7 @@ function writeBatchToInfluxDB(lines) {
 
 function addToBatch(line) {
     _cronVariables.batch.push(line);
+    if (_cronVariables.batch.length >= MAX_BATCH_LINES) flushBatch();
 }
 
 function flushBatch() {
@@ -309,7 +282,7 @@ function validateCron(expr, defaultExpr) {
     return expr;
 }
 
-var _taskKeys = ['metricsTask', 'refreshTask', 'healthCheckTask', 'batchTask'];
+var _taskKeys = ['metricsTask', 'healthCheckTask', 'batchTask'];
 
 function clearAllTasks() {
     for (var i = 0; i < _taskKeys.length; i++) {
@@ -337,12 +310,6 @@ function initCronJobs(options) {
             sendAllMetrics(options);
         });
         log.info("Metrics: Scheduled metrics sending with cron: " + metricsSchedule);
-
-        var refreshSchedule = validateCron(REFRESH_INTERVAL, "0 * * * * *");
-        _cronVariables.refreshTask = Cron.schedule(refreshSchedule, function() {
-            refreshCharsList(options);
-        });
-        log.info("Metrics: Scheduled device refresh with cron: " + refreshSchedule);
     } else {
         log.info("Metrics: Periodic sending disabled");
     }
@@ -379,7 +346,6 @@ function trigger(source, value, variables, options) {
 
         _cronVariables.batch = [];
         initCronJobs(options);
-        refreshCharsList(options);
     }
 
     if (value === null || value === undefined) return;
@@ -393,8 +359,7 @@ function trigger(source, value, variables, options) {
         if (ENABLE_INFLUXDB) sendToInfluxDB(line);
     }
 
-    variables.showDebugLog = options.ShowDebugLog;
-    if (variables.showDebugLog) {
+    if (options.ShowDebugLog) {
         log.info("Metrics: " + source.getService().getName() + " in " + source.getAccessory().getRoom().getName() + " = " + value);
     }
 }
@@ -841,8 +806,6 @@ function runTests() {
         resetTestState();
     }
 }
-
-runTests();
 
 // Проверка доступности баз данных при сохранении сценария
 checkConnectivity();

@@ -12,6 +12,11 @@
 // ЗАГРУЗКА UNIT TESTS FRAMEWORK
 // ============================================================================
 
+// unitTests.js захватывает логгер при загрузке (global.log ещё не объявлен),
+// поэтому assert'ы пишут в console.error — это единственный признак провала теста
+const _consoleError = console.error;
+console.error = function() { process.exitCode = 1; _consoleError.apply(console, arguments); };
+
 const unitTests = require('../global/unitTests.js');
 
 // Экспортируем все функции в global
@@ -72,10 +77,12 @@ global.HC = {
 // MOCK: log object
 // ============================================================================
 
+// assert-функции из unitTests.js не бросают исключений, а только логируют через
+// log.error — для CI это единственный признак провала теста
 global.log = {
     info: (msg) => console.log("[INFO]", msg),
     warn: (msg) => console.log("[WARN]", msg),
-    error: (msg) => console.log("[ERROR]", msg)
+    error: (msg) => { console.log("[ERROR]", msg); process.exitCode = 1; }
 };
 
 // ============================================================================
@@ -149,10 +156,7 @@ scenarios.forEach(function(scenario) {
     // Сброс состояния между сценариями
     global.httpRequests = [];
 
-    let scenarioCode = fs.readFileSync(scenarioPath, 'utf8');
-
-    // Enable tests by replacing isDeveloping = false with true
-    scenarioCode = scenarioCode.replace('var isDeveloping = false;', 'var isDeveloping = true;');
+    const scenarioCode = fs.readFileSync(scenarioPath, 'utf8');
 
     console.log("=".repeat(60));
     console.log(scenario.name + " - Unit Tests");
@@ -160,8 +164,8 @@ scenarios.forEach(function(scenario) {
     console.log("");
 
     try {
-        // Execute scenario code
-        eval(scenarioCode);
+        // Сценарии не вызывают runTests() сами — тесты запускает только раннер
+        eval(scenarioCode + "\nif (typeof runTests === 'function') runTests();");
     } catch (e) {
         console.error("[FATAL]", e.message);
         console.error(e.stack);
@@ -173,7 +177,7 @@ scenarios.forEach(function(scenario) {
 
 console.log("=".repeat(60));
 
-if (process.exitCode === 1) {
+if (process.exitCode) {
     console.log("РЕЗУЛЬТАТ: ЕСТЬ ОШИБКИ");
 } else {
     console.log("РЕЗУЛЬТАТ: ВСЕ ТЕСТЫ ПРОЙДЕНЫ");
