@@ -12,6 +12,24 @@
 // ЗАГРУЗКА UNIT TESTS FRAMEWORK
 // ============================================================================
 
+// unitTests.js захватывает логгер при загрузке (global.log ещё не объявлен),
+// поэтому assert'ы пишут в console.error — это единственный признак провала теста
+let currentScenario = null;
+const failedScenarios = [];
+const _consoleError = console.error;
+
+console.error = function(msg) {
+    process.exitCode = 1;
+    if (currentScenario) {
+        if (failedScenarios.indexOf(currentScenario) === -1) failedScenarios.push(currentScenario);
+        // GitHub Actions привяжет ошибку к файлу и покажет её в diff'е PR
+        if (process.env.GITHUB_ACTIONS) {
+            console.log("::error file=logic/" + currentScenario + "::" + String(msg).replace(/\n/g, "%0A"));
+        }
+    }
+    _consoleError.apply(console, arguments);
+};
+
 const unitTests = require('../global/unitTests.js');
 
 // Экспортируем все функции в global
@@ -72,10 +90,12 @@ global.HC = {
 // MOCK: log object
 // ============================================================================
 
+// assert-функции из unitTests.js не бросают исключений, а только логируют через
+// log.error — для CI это единственный признак провала теста
 global.log = {
     info: (msg) => console.log("[INFO]", msg),
     warn: (msg) => console.log("[WARN]", msg),
-    error: (msg) => console.log("[ERROR]", msg)
+    error: (msg) => { console.log("[ERROR]", msg); process.exitCode = 1; }
 };
 
 // ============================================================================
@@ -129,52 +149,47 @@ global.Hub = {
 const fs = require('fs');
 const path = require('path');
 
-// Список сценариев с тестами
-const scenarios = [
-    { file: 'awtrixTemperature.js', name: 'AWTRIX Temperature Display' },
-    { file: 'awtrixGarageDoor.js', name: 'AWTRIX Garage Door Indicator' },
-    { file: 'statisticsSensors.js', name: 'Statistics Sensors Metrics' },
-    { file: 'outletScheduler.js', name: 'Outlet Scheduler' }
-];
+// Сценарии подхватываются автоматически — новый файл с function runTests()
+// попадёт в прогон сам, править этот список не нужно
+const scenarios = fs.readdirSync(__dirname)
+    .filter(function(f) { return f.endsWith('.js') && f !== path.basename(__filename); })
+    .sort();
 
-scenarios.forEach(function(scenario) {
-    const scenarioPath = path.join(__dirname, scenario.file);
+scenarios.forEach(function(file) {
+    const scenarioCode = fs.readFileSync(path.join(__dirname, file), 'utf8');
 
-    // Пропускаем если файл не существует
-    if (!fs.existsSync(scenarioPath)) {
-        console.log("[SKIP] " + scenario.name + " - файл не найден");
+    if (!/function\s+runTests\s*\(/.test(scenarioCode)) {
+        console.log("[SKIP] " + file + " — нет function runTests()");
         return;
     }
 
     // Сброс состояния между сценариями
     global.httpRequests = [];
-
-    let scenarioCode = fs.readFileSync(scenarioPath, 'utf8');
-
-    // Enable tests by replacing isDeveloping = false with true
-    scenarioCode = scenarioCode.replace('var isDeveloping = false;', 'var isDeveloping = true;');
+    currentScenario = file;
 
     console.log("=".repeat(60));
-    console.log(scenario.name + " - Unit Tests");
+    console.log(file + " - Unit Tests");
     console.log("=".repeat(60));
     console.log("");
 
     try {
-        // Execute scenario code
-        eval(scenarioCode);
+        // Сценарии не вызывают runTests() сами — тесты запускает только раннер
+        eval(scenarioCode + "\nrunTests();");
     } catch (e) {
         console.error("[FATAL]", e.message);
         console.error(e.stack);
         process.exitCode = 1;
     }
 
+    currentScenario = null;
     console.log("");
 });
 
 console.log("=".repeat(60));
 
-if (process.exitCode === 1) {
+if (process.exitCode) {
     console.log("РЕЗУЛЬТАТ: ЕСТЬ ОШИБКИ");
+    failedScenarios.forEach(function(f) { console.log("  ✗ " + f); });
 } else {
     console.log("РЕЗУЛЬТАТ: ВСЕ ТЕСТЫ ПРОЙДЕНЫ");
 }

@@ -177,4 +177,4 @@ function runTests() {
 }
 
 // Запуск тестов
-runTests();
+

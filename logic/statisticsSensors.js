@@ -842,7 +842,7 @@ function runTests() {
     }
 }
 
-runTests();
+// Тесты запускает только logic/test-runner.js (CI) — на хабе они жрут память
 
 // Проверка доступности баз данных при сохранении сценария
 checkConnectivity();
