@@ -8,6 +8,7 @@ function setup(count) {
     const timers = [];
     const requests = [];
     const errors = [];
+    const cronTasks = [];
     let reads = 0;
     let scans = 0;
     const types = new Proxy({}, { get: (_, key) => key });
@@ -39,7 +40,11 @@ function setup(count) {
         log: { info() {}, warn() {}, error: msg => errors.push(msg) },
         Hub: { getAccessories: () => { scans++; return [accessory]; } },
         HttpClient: { GET: request, POST: request },
-        Cron: { schedule: () => ({}) },
+        Cron: { schedule: (expression, handler) => {
+            const task = { expression, handler };
+            cronTasks.push(task);
+            return task;
+        } },
         setInterval: () => ({}),
         setTimeout: handler => { const task = { handler }; timers.push(task); return task; },
         clear: task => { task.cancelled = true; }
@@ -54,7 +59,7 @@ function setup(count) {
         while (timers.length && limit-- > 0) tick();
         assert.ok(limit > 0, 'scan must finish');
     }
-    return { context, chr, timers, requests, errors, tick, drain,
+    return { context, chr, timers, requests, errors, cronTasks, tick, drain,
         reads: () => reads, scans: () => scans };
 }
 
@@ -81,27 +86,38 @@ test('refresh yields between chunks and publishes only a complete list', () => {
     assert.equal(env.reads(), 500);
 });
 
-test('first hourly snapshot waits for collection; triggers still buffer events', () => {
+test('hourly cron sends idle sensor values without waiting for refresh timers', () => {
     const env = setup(500);
     env.context.trigger(env.chr, 22, {}, {});
-    env.context.sendAllMetrics({});
-    assert.equal(env.requests.length, 0);
-    env.context.trigger(env.chr, 23, {}, {});
-    assert.equal(env.context._cronVariables.batch.length, 2);
-    env.drain();
-    assert.equal(env.requests.length, 2, 'complete snapshot goes to both databases');
+    const hourly = env.cronTasks.find(task => task.expression === '0 0 * * * *');
+    assert.ok(hourly, 'hourly job must be registered');
+    // The minute refresh has started, but its timer has not run yet.
+    env.context.refreshCharsList({});
+    hourly.handler();
+    assert.equal(env.requests.length, 2, 'hourly callback must send to both databases');
     assert.equal(env.requests[0].bodyContent.split('\n').length, 500);
     assert.equal(env.requests[1].bodyContent, env.requests[0].bodyContent);
+    env.chr.getValue = () => 24;
+    hourly.handler();
+    assert.equal(env.requests.length, 4, 'next hour must send even without sensor events');
+    assert.match(env.requests[2].bodyContent, /value=24 /);
+    assert.equal(env.context._cronVariables.batch.length, 1, 'snapshot must preserve event buffer');
+    env.drain();
+    assert.equal(env.requests.length, 4, 'refresh completion must not duplicate the snapshot');
 });
 
-test('empty list is cached without repeatedly scanning the hub', () => {
+test('hourly collection retries an empty list when devices become available', () => {
     const env = setup(0);
-    env.context.sendAllMetrics({});
-    env.drain();
-    env.context.sendAllMetrics({});
-    env.drain();
-    assert.equal(env.scans(), 1);
+    env.context.trigger(env.chr, 22, {}, {});
+    const hourly = env.cronTasks.find(task => task.expression === '0 0 * * * *');
+    hourly.handler();
     assert.equal(env.requests.length, 0);
+    env.context.Hub.getAccessories = () => [{
+        getRoom: () => ({ getName: () => 'Kitchen' }),
+        getServices: () => [{ getCharacteristics: () => [env.chr] }]
+    }];
+    hourly.handler();
+    assert.equal(env.requests.length, 2, 'empty cache must not suppress later hourly snapshots');
 });
 
 test('clearing tasks cancels an in-progress scan', () => {

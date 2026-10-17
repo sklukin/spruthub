@@ -16,7 +16,6 @@ var _cronVariables = {
     charsList: null,
     scan: null,
     scanTask: null,
-    pendingSnapshot: null,
     batch: [],          // массив строк Line Protocol для батчинга
     batchTask: null,    // задача setInterval для flush
     lastHealthStatus: { vm: true, influx: true }  // для дедупликации уведомлений
@@ -209,6 +208,41 @@ function isExcludedRoom(roomName) {
     return false;
 }
 
+// Часовой снимок собирает список синхронно, если кеш ещё не готов.
+function buildCharsList() {
+    var list = [];
+    var accessories = Hub.getAccessories();
+
+    for (var i = 0; i < accessories.length; i++) {
+        var accessory = accessories[i];
+
+        // Пропускаем исключённые комнаты
+        if (isExcludedRoom(accessory.getRoom().getName())) continue;
+
+        var services = accessory.getServices();
+        for (var j = 0; j < services.length; j++) {
+            var service = services[j];
+            var chars = service.getCharacteristics();
+
+            for (var k = 0; k < chars.length; k++) {
+                var ch = chars[k];
+                if (isMonitoredCharacteristic(ch.getType())) {
+                    list.push(ch);
+                }
+            }
+        }
+    }
+
+    return list;
+}
+
+function getCharsList() {
+    if (!_cronVariables.charsList || _cronVariables.charsList.length === 0) {
+        _cronVariables.charsList = buildCharsList();
+    }
+    return _cronVariables.charsList;
+}
+
 // Старый список остаётся доступен до полного завершения нового обхода.
 function refreshCharsList(options) {
     if (_cronVariables.scan) return;
@@ -250,9 +284,6 @@ function collectCharsChunk(scan) {
                     log.info("Metrics: Device list refreshed, " + scan.list.length +
                         " characteristics in " + (Date.now() - scan.startedAt) + "ms");
                 }
-                var pending = _cronVariables.pendingSnapshot;
-                _cronVariables.pendingSnapshot = null;
-                if (pending) sendAllMetrics(pending);
                 return;
             }
         }
@@ -261,7 +292,6 @@ function collectCharsChunk(scan) {
         }, SCAN_DELAY_MS);
     } catch(e) {
         _cronVariables.scan = null;
-        _cronVariables.pendingSnapshot = null;
         log.error("Metrics: Device refresh failed: " + e.message);
     }
 }
@@ -271,12 +301,7 @@ function collectCharsChunk(scan) {
 // ============================================================================
 
 function sendAllMetrics(options) {
-    var list = _cronVariables.charsList;
-    if (list === null) {
-        _cronVariables.pendingSnapshot = options || {};
-        refreshCharsList(options);
-        return;
-    }
+    var list = getCharsList();
     var lines = [];
 
     for (var i = 0; i < list.length; i++) {
@@ -341,7 +366,6 @@ var _taskKeys = ['metricsTask', 'refreshTask', 'healthCheckTask', 'batchTask', '
 
 function clearAllTasks() {
     _cronVariables.scan = null;
-    _cronVariables.pendingSnapshot = null;
     for (var i = 0; i < _taskKeys.length; i++) {
         var key = _taskKeys[i];
         if (_cronVariables[key]) {
