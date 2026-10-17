@@ -14,6 +14,9 @@ var _cronVariables = {
     refreshTask: null,
     healthCheckTask: null,
     charsList: null,
+    scan: null,
+    scanTask: null,
+    pendingSnapshot: null,
     batch: [],          // массив строк Line Protocol для батчинга
     batchTask: null,    // задача setInterval для flush
     lastHealthStatus: { vm: true, influx: true }  // для дедупликации уведомлений
@@ -53,6 +56,11 @@ const EXCLUDED_ROOMS = [
 const ENABLE_PERIODIC_SEND = true;
 const CRON_SCHEDULE = "0 0 * * * *";           // Раз в час
 const REFRESH_INTERVAL = "0 * * * * *";         // Раз в минуту
+
+// Порция обхода ограничена и числом шагов, и временем между вызовами API.
+const SCAN_MAX_STEPS = 100;
+const SCAN_TIME_BUDGET_MS = 20;
+const SCAN_DELAY_MS = 50;
 
 // Настройки проверки доступности баз данных
 const ENABLE_HEALTH_CHECK = true;
@@ -201,45 +209,60 @@ function isExcludedRoom(roomName) {
     return false;
 }
 
-function buildCharsList() {
-    var list = [];
-    var accessories = Hub.getAccessories();
+// Старый список остаётся доступен до полного завершения нового обхода.
+function refreshCharsList(options) {
+    if (_cronVariables.scan) return;
+    var scan = {
+        accessories: null, services: [], chars: [],
+        accessoryIndex: 0, serviceIndex: 0, charIndex: 0,
+        list: [], options: options, startedAt: Date.now()
+    };
+    _cronVariables.scan = scan;
+    _cronVariables.scanTask = setTimeout(function() {
+        collectCharsChunk(scan);
+    }, SCAN_DELAY_MS);
+}
 
-    for (var i = 0; i < accessories.length; i++) {
-        var accessory = accessories[i];
+function collectCharsChunk(scan) {
+    if (_cronVariables.scan !== scan) return;
+    _cronVariables.scanTask = null;
+    try {
+        var startedAt = Date.now();
+        if (scan.accessories === null) scan.accessories = Hub.getAccessories();
 
-        // Пропускаем исключённые комнаты
-        if (isExcludedRoom(accessory.getRoom().getName())) continue;
+        for (var step = 0; step < SCAN_MAX_STEPS; step++) {
+            if (Date.now() - startedAt >= SCAN_TIME_BUDGET_MS) break;
 
-        var services = accessory.getServices();
-        for (var j = 0; j < services.length; j++) {
-            var service = services[j];
-            var chars = service.getCharacteristics();
-
-            for (var k = 0; k < chars.length; k++) {
-                var ch = chars[k];
-                if (isMonitoredCharacteristic(ch.getType())) {
-                    list.push(ch);
+            if (scan.charIndex < scan.chars.length) {
+                var ch = scan.chars[scan.charIndex++];
+                if (isMonitoredCharacteristic(ch.getType())) scan.list.push(ch);
+            } else if (scan.serviceIndex < scan.services.length) {
+                scan.chars = scan.services[scan.serviceIndex++].getCharacteristics();
+                scan.charIndex = 0;
+            } else if (scan.accessoryIndex < scan.accessories.length) {
+                var accessory = scan.accessories[scan.accessoryIndex++];
+                scan.services = isExcludedRoom(accessory.getRoom().getName()) ? [] : accessory.getServices();
+                scan.serviceIndex = 0;
+            } else {
+                _cronVariables.charsList = scan.list;
+                _cronVariables.scan = null;
+                if (scan.options && scan.options.ShowDebugLog) {
+                    log.info("Metrics: Device list refreshed, " + scan.list.length +
+                        " characteristics in " + (Date.now() - scan.startedAt) + "ms");
                 }
+                var pending = _cronVariables.pendingSnapshot;
+                _cronVariables.pendingSnapshot = null;
+                if (pending) sendAllMetrics(pending);
+                return;
             }
         }
-    }
-
-    return list;
-}
-
-function getCharsList() {
-    if (!_cronVariables.charsList || _cronVariables.charsList.length === 0) {
-        _cronVariables.charsList = buildCharsList();
-    }
-    return _cronVariables.charsList;
-}
-
-function refreshCharsList(options) {
-    _cronVariables.charsList = buildCharsList();
-
-    if (options && options.ShowDebugLog) {
-        log.info("Metrics: Device list refreshed, " + _cronVariables.charsList.length + " characteristics");
+        _cronVariables.scanTask = setTimeout(function() {
+            collectCharsChunk(scan);
+        }, SCAN_DELAY_MS);
+    } catch(e) {
+        _cronVariables.scan = null;
+        _cronVariables.pendingSnapshot = null;
+        log.error("Metrics: Device refresh failed: " + e.message);
     }
 }
 
@@ -248,7 +271,12 @@ function refreshCharsList(options) {
 // ============================================================================
 
 function sendAllMetrics(options) {
-    var list = getCharsList();
+    var list = _cronVariables.charsList;
+    if (list === null) {
+        _cronVariables.pendingSnapshot = options || {};
+        refreshCharsList(options);
+        return;
+    }
     var lines = [];
 
     for (var i = 0; i < list.length; i++) {
@@ -309,9 +337,11 @@ function validateCron(expr, defaultExpr) {
     return expr;
 }
 
-var _taskKeys = ['metricsTask', 'refreshTask', 'healthCheckTask', 'batchTask'];
+var _taskKeys = ['metricsTask', 'refreshTask', 'healthCheckTask', 'batchTask', 'scanTask'];
 
 function clearAllTasks() {
+    _cronVariables.scan = null;
+    _cronVariables.pendingSnapshot = null;
     for (var i = 0; i < _taskKeys.length; i++) {
         var key = _taskKeys[i];
         if (_cronVariables[key]) {
@@ -379,7 +409,6 @@ function trigger(source, value, variables, options) {
 
         _cronVariables.batch = [];
         initCronJobs(options);
-        refreshCharsList(options);
     }
 
     if (value === null || value === undefined) return;
@@ -844,5 +873,5 @@ function runTests() {
 
 // Тесты запускает только logic/test-runner.js (CI) — на хабе они жрут память
 
-// Проверка доступности баз данных при сохранении сценария
-checkConnectivity();
+// Проверка доступности баз данных выполняется по HEALTH_CHECK_SCHEDULE.
+// При загрузке сценария сетевые запросы не выполняются.

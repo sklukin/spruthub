@@ -13,3 +13,4 @@ jobs:
         with:
           node-version: '20'
       - run: node logic/test-runner.js
+      - run: node --test tests/*.test.js
