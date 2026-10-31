@@ -1,0 +1,4159 @@
+{
+  "uid": "node-exporter-host",
+  "title": "Хост (node_exporter)",
+  "description": "Всё, что отдаёт node_exporter на sklukinLab (192.168.1.60:9100): CPU, память, ZFS ARC, диски, файловые системы, сеть, железо по IPMI/hwmon, SMART/NVMe, systemd. Дополняет дашборд Proxmox VE, который смотрит на те же метрики глазами pvestatd. Управляется из репозитория homelab/grafana — правки через UI перетрутся следующим деплоем.",
+  "tags": [
+    "node-exporter",
+    "victoriametrics",
+    "homelab"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "15m",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "DS",
+        "label": "Источник данных",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "refresh": 1,
+        "regex": ""
+      },
+      {
+        "type": "query",
+        "name": "node",
+        "label": "Хост",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS}"
+        },
+        "query": {
+          "query": "label_values(node_uname_info{job=~\"node(-.*)?\"}, nodename)",
+          "refId": "node"
+        },
+        "definition": "label_values(node_uname_info{job=~\"node(-.*)?\"}, nodename)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": false,
+        "multi": false,
+        "current": {},
+        "options": []
+      },
+      {
+        "type": "query",
+        "name": "disk",
+        "label": "Блочные устройства",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS}"
+        },
+        "query": {
+          "query": "label_values(node_disk_io_time_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\",device=~\"sd[a-z]|nvme[0-9]n[0-9]\"}, device)",
+          "refId": "disk"
+        },
+        "definition": "label_values(node_disk_io_time_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\",device=~\"sd[a-z]|nvme[0-9]n[0-9]\"}, device)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Обзор",
+      "id": 1,
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Uptime",
+      "id": 2,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_time_seconds{job=~\"node(-.*)?\",nodename=\"$node\"} - node_boot_time_seconds{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "uptime",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "CPU",
+      "id": 3,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 3,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.75
+              },
+              {
+                "color": "red",
+                "value": 0.9
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1 - avg(rate(node_cpu_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\",mode=\"idle\"}[$__rate_interval]))",
+          "legendFormat": "busy",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Load 1m",
+      "id": 4,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 6,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_load1{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "load1",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "RAM",
+      "id": 5,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.8
+              },
+              {
+                "color": "red",
+                "value": 0.9
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1 - node_memory_MemAvailable_bytes{job=~\"node(-.*)?\",nodename=\"$node\"} / node_memory_MemTotal_bytes{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "занято",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Swap",
+      "id": 6,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 12,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.25
+              },
+              {
+                "color": "red",
+                "value": 0.5
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(node_memory_SwapTotal_bytes{job=~\"node(-.*)?\",nodename=\"$node\"} - node_memory_SwapFree_bytes{job=~\"node(-.*)?\",nodename=\"$node\"}) / (node_memory_SwapTotal_bytes{job=~\"node(-.*)?\",nodename=\"$node\"} > 0)",
+          "legendFormat": "занято",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Root FS",
+      "id": 7,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 15,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.75
+              },
+              {
+                "color": "red",
+                "value": 0.85
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1 - node_filesystem_avail_bytes{job=~\"node(-.*)?\",nodename=\"$node\",mountpoint=\"/\"} / node_filesystem_size_bytes{job=~\"node(-.*)?\",nodename=\"$node\",mountpoint=\"/\"}",
+          "legendFormat": "занято",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Упавшие юниты",
+      "id": 8,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 18,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_systemd_units{job=~\"node(-.*)?\",nodename=\"$node\",state=\"failed\"}",
+          "legendFormat": "failed",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Security-обновления",
+      "id": 9,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 21,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 20
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(apt_upgrades_pending{job=~\"node(-.*)?\",nodename=\"$node\",origin=~\".*security.*\"})",
+          "legendFormat": "security",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Нужна перезагрузка",
+      "id": 10,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "нет",
+                  "color": "green",
+                  "index": 0
+                },
+                "1": {
+                  "text": "да",
+                  "color": "orange",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_reboot_required{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "reboot",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "SMART",
+      "id": 11,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 3,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "СБОЙ",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "все ок",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "min(smartmon_device_smart_healthy{job=~\"node(-.*)?\",nodename=\"$node\"})",
+          "legendFormat": "healthy",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Износ NVMe",
+      "id": 12,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 6,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.8
+              },
+              {
+                "color": "red",
+                "value": 0.9
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(nvme_percentage_used_ratio{job=~\"node(-.*)?\",nodename=\"$node\"})",
+          "legendFormat": "wear",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "CPU макс. °C",
+      "id": 13,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 79
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(node_hwmon_temp_celsius{job=~\"node(-.*)?\",nodename=\"$node\",chip=~\"platform_coretemp.*\"})",
+          "legendFormat": "cpu",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Вентиляторы мин.",
+      "id": 14,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 12,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rotrpm",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1000
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "min(node_ipmi_speed_rpm{job=~\"node(-.*)?\",nodename=\"$node\"})",
+          "legendFormat": "min rpm",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Conntrack",
+      "id": 15,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 15,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.7
+              },
+              {
+                "color": "red",
+                "value": 0.85
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_nf_conntrack_entries{job=~\"node(-.*)?\",nodename=\"$node\"} / node_nf_conntrack_entries_limit{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "занято",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Часы синхронизированы",
+      "id": 16,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 18,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "нет",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "да",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_timex_sync_status{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "ntp",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "ZFS ARC",
+      "id": 17,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 21,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_zfs_arc_size{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "arc",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Железо: температуры, вентиляторы, питание",
+      "id": 70,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Температуры hwmon",
+      "id": 71,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "coretemp — ядра двух Xeon (порог ядра 79 °C, критический 89), intel5500 — северный мост, у него рабочая норма около 75 °C.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_hwmon_temp_celsius{job=~\"node(-.*)?\",nodename=\"$node\"} * on(chip, instance) group_left(chip_name) node_hwmon_chip_names{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{chip_name}} {{sensor}}",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "expr": "node_hwmon_temp_max_celsius{job=~\"node(-.*)?\",nodename=\"$node\",chip=~\"platform_coretemp.*\",sensor=\"temp2\"}",
+          "legendFormat": "порог coretemp",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Температуры дисков",
+      "id": 72,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Данные из двух источников: drivetemp через hwmon и smartctl через textfile-коллектор. Для HDD выше 50 °C — повод посмотреть на обдув.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_temperature_celsius_raw_value{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{disk}}",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "expr": "nvme_temperature_celsius{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{device}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Вентиляторы",
+      "id": 73,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Ноль оборотов на живом сервере — либо вентилятор встал, либо его вытащили.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rotrpm",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_ipmi_speed_rpm{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{sensor}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "min",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Напряжения",
+      "id": 74,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "VBAT ниже 2.8 В — пора менять батарейку CMOS. Просадка +12 В — блок питания.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "volt",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_ipmi_volts{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{sensor}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "min",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Температуры IPMI (память, корпус)",
+      "id": 75,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_ipmi_temperature_celsius{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{sensor}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Ошибки памяти (EDAC) и OOM",
+      "id": 76,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Correctable ECC чинятся на лету, но растущий счётчик — заявка на замену планки. Uncorrectable роняет хост.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_edac_correctable_errors_total{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "correctable ctrl{{controller}}",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "expr": "node_edac_uncorrectable_errors_total{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "uncorrectable ctrl{{controller}}",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "C",
+          "expr": "node_vmstat_oom_kill{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "oom kills",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "CPU и нагрузка",
+      "id": 20,
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU по режимам",
+      "id": 21,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Доля времени всех потоков в каждом режиме ядра. iowait — ждём диск, steal — у гипервизора отняли такт.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "opacity",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg by(mode) (rate(node_cpu_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\",mode!=\"idle\"}[$__rate_interval]))",
+          "legendFormat": "{{mode}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Load average",
+      "id": 22,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Пунктир — число потоков CPU (24). Load выше него значит, что очередь на выполнение длиннее, чем железо успевает разбирать.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_load1{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "load1",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "expr": "node_load5{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "load5",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "C",
+          "expr": "node_load15{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "load15",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "D",
+          "expr": "count(node_cpu_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\",mode=\"idle\"})",
+          "legendFormat": "потоков CPU",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Загрузка по ядрам",
+      "id": 23,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "24 потока двух Xeon. Одно ядро в полке при простое остальных — однопоточная задача, а не нехватка CPU.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 43
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1 - rate(node_cpu_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\",mode=\"idle\"}[$__rate_interval])",
+          "legendFormat": "cpu{{cpu}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "PSI: сколько времени задачи ждут ресурс",
+      "id": 24,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Pressure Stall Information. waiting — часть задач ждёт, stalled — не может работать никто. На этой ноде io waiting штатно держится около 0.3–0.5: HDD-пул под восемью гостями.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 43
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(node_pressure_cpu_waiting_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+          "legendFormat": "cpu waiting",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "expr": "rate(node_pressure_io_waiting_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+          "legendFormat": "io waiting",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "C",
+          "expr": "rate(node_pressure_io_stalled_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+          "legendFormat": "io stalled",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "D",
+          "expr": "rate(node_pressure_memory_waiting_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+          "legendFormat": "memory waiting",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "E",
+          "expr": "rate(node_pressure_memory_stalled_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+          "legendFormat": "memory stalled",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Переключения контекста и прерывания",
+      "id": 25,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 51
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(node_context_switches_total{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+          "legendFormat": "context switches",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "expr": "rate(node_intr_total{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+          "legendFormat": "interrupts",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Процессы",
+      "id": 26,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "blocked — процессы в непрерывном ожидании диска (D-state). Растёт вместе с PSI I/O.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 51
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_procs_running{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "running",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "expr": "node_procs_blocked{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "blocked",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "C",
+          "expr": "rate(node_forks_total{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+          "legendFormat": "forks/s",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Здоровье дисков (SMART / NVMe)",
+      "id": 80,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 59
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "SMART: вердикт smartctl",
+      "id": 81,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 60
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "СБОЙ",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "ок",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_device_smart_healthy{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{disk}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Наработка дисков",
+      "id": 82,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Часы включения. Для домашнего сервера ориентир — 40–50 тысяч часов на HDD, дальше диск живёт на удачу.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 60
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_power_on_hours_raw_value{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{disk}}",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "expr": "nvme_power_on_hours_total{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{device}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Включения питания",
+      "id": 101,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Power_Cycle_Count (12): сколько раз диску подавали питание. У этих дисков сотни — сервер почти не выключается.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 60
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_power_cycle_count_raw_value{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{disk}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Парковки головок",
+      "id": 83,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Load_Cycle_Count (193): головки уехали на рампу и вернулись. Паспортный ресурс 300–600 тысяч. Норма здесь 0.2–2 в час; сотни в час — залипший idle-таймер.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 66
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_load_cycle_count_raw_value{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{disk}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Остановки шпинделя",
+      "id": 100,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Start_Stop_Count (4): у здешних WD Red движется быстрее всех остальных счётчиков — 38.6 тыс. при паспортных 100 тыс.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 66
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_start_stop_count_raw_value{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{disk}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Остаток ресурса по мнению диска",
+      "id": 102,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Нормализованные значения тех же атрибутов: диск сам пересчитывает их от своего паспорта. Больше — лучше, шкала у WD начинается с 200 для парковок и со 100 для start/stop.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 66
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_load_cycle_count_value{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{disk}} парковки",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "expr": "smartmon_start_stop_count_value{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{disk}} start/stop",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Переназначенные секторы",
+      "id": 103,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Reallocated_Sector_Ct (5): поверхность посыпалась, диск подменил сектор из резерва. Любой рост — заявка на замену.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 72
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_reallocated_sector_ct_raw_value{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{disk}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Секторы-кандидаты",
+      "id": 104,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Current_Pending_Sector (197): сектор не читается, но диск ещё не решил его переназначить. Это уже потерянные данные на блоке.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 72
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_current_pending_sector_raw_value{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{disk}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Неисправимые offline",
+      "id": 105,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Offline_Uncorrectable (198): фоновая проверка нашла блок, который не читается никак.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 72
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_offline_uncorrectable_raw_value{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{disk}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Ошибки UDMA CRC",
+      "id": 106,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "UDMA_CRC_Error_Count (199): битые пакеты по интерфейсу. Это шлейф, бэкплейн или порт контроллера, а не поверхность.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 78
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_udma_crc_error_count_raw_value{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{disk}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Повторы раскрутки",
+      "id": 107,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Spin_Retry_Count (10): шпиндель не смог раскрутиться с первой попытки. Признак умирающей механики.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 78
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_spin_retry_count_raw_value{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{disk}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "NVMe: израсходованный ресурс",
+      "id": 108,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "percentage_used: оценка износа самим диском. 1.0 — паспортный ресурс записи исчерпан.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 78
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nvme_percentage_used_ratio{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{device}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "NVMe: резервные блоки",
+      "id": 109,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "available_spare против порога производителя. Пересечение линий означает, что подменять сбойные блоки больше нечем.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 84
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nvme_available_spare_ratio{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{device}} spare",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "expr": "nvme_available_spare_threshold_ratio{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{device}} порог",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "NVMe: ошибки носителя",
+      "id": 110,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "media_errors: диск не смог прочитать или записать блок.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 84
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nvme_media_errors_total{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{device}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "NVMe: записей в журнале ошибок",
+      "id": 111,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "num_err_log_entries: сколько записей накопил внутренний журнал ошибок контроллера.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 84
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nvme_num_err_log_entries_total{job=~\"node(-.*)?\",nodename=\"$node\"}",
+          "legendFormat": "{{device}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "NVMe: объём записи",
+      "id": 112,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Пересчёт data_units_written (единица — 512 000 байт) в байты в секунду: столько на диск пишут прямо сейчас.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 90
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(nvme_data_units_written_total{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval]) * 512000",
+          "legendFormat": "{{device}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Память",
+      "id": 30,
+      "collapsed": true,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Память",
+          "id": 31,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "MemAvailable — то, что ядро реально готово отдать под новую нагрузку (кеш и ARC сюда входят частично).",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 35
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "min": 0,
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "node_memory_MemTotal_bytes{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "total",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "node_memory_MemAvailable_bytes{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "available",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "C",
+              "expr": "node_memory_MemFree_bytes{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "free",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "D",
+              "expr": "node_memory_Cached_bytes{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "cached",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "E",
+              "expr": "node_memory_Buffers_bytes{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "buffers",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "F",
+              "expr": "node_memory_Slab_bytes{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "slab",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "G",
+              "expr": "node_memory_AnonPages_bytes{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "anon",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "H",
+              "expr": "node_memory_Committed_AS_bytes{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "committed",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Swap и major page faults",
+          "id": 32,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "major faults — страницы, за которыми пришлось идти на диск. Ненулевой поток при пустом swap означает чтение mmap-файлов.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 35
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "min": 0,
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "major faults/s"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "right"
+                  }
+                ]
+              }
+            ]
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "node_memory_SwapTotal_bytes{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "swap total",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "node_memory_SwapTotal_bytes{job=~\"node(-.*)?\",nodename=\"$node\"} - node_memory_SwapFree_bytes{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "swap used",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "C",
+              "expr": "node_memory_SwapCached_bytes{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "swap cached",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "D",
+              "expr": "rate(node_vmstat_pgmajfault{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+              "legendFormat": "major faults/s",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "ZFS ARC: размер",
+          "id": 33,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "ARC — кеш ZFS в оперативке хоста. Упирается в c_max (zfs_arc_max); он же главный едок RAM на этой ноде.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 43
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "min": 0,
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "node_zfs_arc_size{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "size",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "node_zfs_arc_c{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "target (c)",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "C",
+              "expr": "node_zfs_arc_c_max{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "c_max",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "D",
+              "expr": "node_zfs_arc_c_min{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "c_min",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "E",
+              "expr": "node_zfs_arc_compressed_size{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "compressed",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "ZFS ARC: попадания",
+          "id": 34,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Hit ratio ниже 0.9 надолго — либо ARC зажали, либо рабочий набор перестал влезать.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 43
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "hit ratio"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "right"
+                  },
+                  {
+                    "id": "max",
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "rate(node_zfs_arc_hits{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+              "legendFormat": "hits/s",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "rate(node_zfs_arc_misses{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+              "legendFormat": "misses/s",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "C",
+              "expr": "rate(node_zfs_arc_hits{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval]) / (rate(node_zfs_arc_hits{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval]) + rate(node_zfs_arc_misses{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval]))",
+              "legendFormat": "hit ratio",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 96
+      }
+    },
+    {
+      "type": "row",
+      "title": "Диски: I/O",
+      "id": 40,
+      "collapsed": true,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "IOPS",
+          "id": 41,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 52
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "iops",
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "rate(node_disk_reads_completed_total{job=~\"node(-.*)?\",nodename=\"$node\",device=~\"$disk\"}[$__rate_interval])",
+              "legendFormat": "{{device}} чтение",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "-rate(node_disk_writes_completed_total{job=~\"node(-.*)?\",nodename=\"$node\",device=~\"$disk\"}[$__rate_interval])",
+              "legendFormat": "{{device}} запись",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Пропускная способность",
+          "id": 42,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Запись отложена вниз, чтобы читалось направление потока.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 52
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "rate(node_disk_read_bytes_total{job=~\"node(-.*)?\",nodename=\"$node\",device=~\"$disk\"}[$__rate_interval])",
+              "legendFormat": "{{device}} чтение",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "-rate(node_disk_written_bytes_total{job=~\"node(-.*)?\",nodename=\"$node\",device=~\"$disk\"}[$__rate_interval])",
+              "legendFormat": "{{device}} запись",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Латентность операций",
+          "id": 43,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Среднее время операции (await). Для HDD норма — десятки миллисекунд, для NVMe — доли миллисекунды.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 60
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "min": 0,
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "rate(node_disk_read_time_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\",device=~\"$disk\"}[$__rate_interval]) / (rate(node_disk_reads_completed_total{job=~\"node(-.*)?\",nodename=\"$node\",device=~\"$disk\"}[$__rate_interval]) > 0)",
+              "legendFormat": "{{device}} чтение",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "rate(node_disk_write_time_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\",device=~\"$disk\"}[$__rate_interval]) / (rate(node_disk_writes_completed_total{job=~\"node(-.*)?\",nodename=\"$node\",device=~\"$disk\"}[$__rate_interval]) > 0)",
+              "legendFormat": "{{device}} запись",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Утилизация и очередь",
+          "id": 44,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Утилизация — доля времени, когда у устройства была хоть одна операция в работе. 100% у HDD означает, что он занят целиком.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 60
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": ".*очередь.*"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "right"
+                  }
+                ]
+              }
+            ]
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "rate(node_disk_io_time_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\",device=~\"$disk\"}[$__rate_interval])",
+              "legendFormat": "{{device}} утилизация",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "rate(node_disk_io_time_weighted_seconds_total{job=~\"node(-.*)?\",nodename=\"$node\",device=~\"$disk\"}[$__rate_interval])",
+              "legendFormat": "{{device}} очередь",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 97
+      }
+    },
+    {
+      "type": "row",
+      "title": "Файловые системы",
+      "id": 50,
+      "collapsed": true,
+      "panels": [
+        {
+          "type": "bargauge",
+          "title": "Заполненность",
+          "id": 51,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 69
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 85
+                  }
+                ]
+              },
+              "custom": {}
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "100 * (1 - node_filesystem_avail_bytes{job=~\"node(-.*)?\",nodename=\"$node\",fstype=~\"ext4|xfs|zfs\"} / node_filesystem_size_bytes{job=~\"node(-.*)?\",nodename=\"$node\",fstype=~\"ext4|xfs|zfs\"})",
+              "legendFormat": "{{mountpoint}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "displayMode": "gradient",
+            "orientation": "horizontal",
+            "showUnfilled": true,
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Свободное место",
+          "id": 52,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "У датасетов ZFS свободное место общее на пул — цифры /data и /data/* двигаются вместе.",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 69
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "min": 0,
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "node_filesystem_avail_bytes{job=~\"node(-.*)?\",nodename=\"$node\",fstype=~\"ext4|xfs|zfs\"}",
+              "legendFormat": "{{mountpoint}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Inodes заняты",
+          "id": 53,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Только ext4/xfs: у ZFS inode выделяются динамически, там эта метрика ни о чём.",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 69
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "100 * (1 - node_filesystem_files_free{job=~\"node(-.*)?\",nodename=\"$node\",fstype=~\"ext4|xfs\"} / node_filesystem_files{job=~\"node(-.*)?\",nodename=\"$node\",fstype=~\"ext4|xfs\"})",
+              "legendFormat": "{{mountpoint}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 98
+      }
+    },
+    {
+      "type": "row",
+      "title": "Сеть",
+      "id": 60,
+      "collapsed": true,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Трафик физических интерфейсов и мостов",
+          "id": 61,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Интерфейсы гостей (tap/veth/fw*) отфильтрованы — они видны на дашборде Proxmox VE.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 78
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bps",
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "rate(node_network_receive_bytes_total{job=~\"node(-.*)?\",nodename=\"$node\",device!~\"lo|fw.+|tap.+|veth.+\"}[$__rate_interval]) * 8",
+              "legendFormat": "{{device}} rx",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "-rate(node_network_transmit_bytes_total{job=~\"node(-.*)?\",nodename=\"$node\",device!~\"lo|fw.+|tap.+|veth.+\"}[$__rate_interval]) * 8",
+              "legendFormat": "{{device}} tx",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Ошибки и потери пакетов",
+          "id": 62,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Ненулевые errs — почти всегда физика: кабель, порт, SFP. Drops на мосту бывают штатными (broadcast без получателя).",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 78
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "pps",
+              "min": 0,
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "rate(node_network_receive_errs_total{job=~\"node(-.*)?\",nodename=\"$node\",device!~\"lo|fw.+|tap.+|veth.+\"}[$__rate_interval])",
+              "legendFormat": "{{device}} rx errs",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "rate(node_network_transmit_errs_total{job=~\"node(-.*)?\",nodename=\"$node\",device!~\"lo|fw.+|tap.+|veth.+\"}[$__rate_interval])",
+              "legendFormat": "{{device}} tx errs",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "C",
+              "expr": "rate(node_network_receive_drop_total{job=~\"node(-.*)?\",nodename=\"$node\",device!~\"lo|fw.+|tap.+|veth.+\"}[$__rate_interval])",
+              "legendFormat": "{{device}} rx drop",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "D",
+              "expr": "rate(node_network_transmit_drop_total{job=~\"node(-.*)?\",nodename=\"$node\",device!~\"lo|fw.+|tap.+|veth.+\"}[$__rate_interval])",
+              "legendFormat": "{{device}} tx drop",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "E",
+              "expr": "rate(node_softnet_dropped_total{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+              "legendFormat": "softnet dropped cpu{{cpu}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "TCP",
+          "id": 63,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Ретрансмиты и таймауты — состояние канала. ListenOverflows означает, что кто-то не успевает принимать соединения (backlog переполнен).",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 86
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "node_netstat_Tcp_CurrEstab{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "established",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "rate(node_netstat_Tcp_RetransSegs{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+              "legendFormat": "retrans/s",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "C",
+              "expr": "rate(node_netstat_TcpExt_TCPTimeouts{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+              "legendFormat": "timeouts/s",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "D",
+              "expr": "rate(node_netstat_TcpExt_ListenOverflows{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+              "legendFormat": "listen overflows/s",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "E",
+              "expr": "rate(node_netstat_Tcp_OutRsts{job=~\"node(-.*)?\",nodename=\"$node\"}[$__rate_interval])",
+              "legendFormat": "resets/s",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Сокеты и conntrack",
+          "id": 64,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 86
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "node_sockstat_TCP_inuse{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "tcp inuse",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "node_sockstat_TCP_tw{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "tcp time-wait",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "C",
+              "expr": "node_sockstat_UDP_inuse{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "udp inuse",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "D",
+              "expr": "node_nf_conntrack_entries{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "conntrack entries",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "E",
+              "expr": "node_nf_conntrack_entries_limit{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "conntrack limit",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 99
+      }
+    },
+    {
+      "type": "row",
+      "title": "Система",
+      "id": 90,
+      "collapsed": true,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "systemd: юниты по состояниям",
+          "id": 91,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 135
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "node_systemd_units{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "{{state}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "systemd: упавшие юниты поимённо",
+          "id": 92,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Пусто — значит всё в порядке.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 135
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "max": 1,
+              "custom": {
+                "fillOpacity": 20,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "node_systemd_unit_state{job=~\"node(-.*)?\",nodename=\"$node\",state=\"failed\"} > 0",
+              "legendFormat": "{{name}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Дескрипторы и энтропия",
+          "id": 93,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 143
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "node_filefd_allocated{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "открытых файлов",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "node_entropy_available_bits{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "энтропия, бит",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "bargauge",
+          "title": "Пакеты к обновлению",
+          "id": 94,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Считает apt_info textfile-коллектора: сколько пакетов ждёт apt upgrade, с разбивкой по репозиторию.",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 143
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 20
+                  },
+                  {
+                    "color": "orange",
+                    "value": 50
+                  }
+                ]
+              },
+              "custom": {}
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by(origin) (apt_upgrades_pending{job=~\"node(-.*)?\",nodename=\"$node\"})",
+              "legendFormat": "{{origin}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "displayMode": "gradient",
+            "orientation": "horizontal",
+            "showUnfilled": true,
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Часы",
+          "id": 95,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "sync status 0 означает, что ядро считает время несинхронизированным: NTP отвалился или дрейф вышел за допуск.",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 143
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "sync status"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "right"
+                  }
+                ]
+              }
+            ]
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "node_timex_offset_seconds{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "offset",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "node_timex_estimated_error_seconds{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "estimated error",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "C",
+              "expr": "node_timex_sync_status{job=~\"node(-.*)?\",nodename=\"$node\"}",
+              "legendFormat": "sync status",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 100
+      }
+    }
+  ]
+}

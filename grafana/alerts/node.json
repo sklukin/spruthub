@@ -1,0 +1,365 @@
+{
+  "folder": "Homelab",
+  "folderUid": "homelab",
+  "interval": "1m",
+  "service": "node",
+  "groups": {
+    "node-host": [
+      {
+        "uid": "node-absent",
+        "title": "Хост: node_exporter не отвечает",
+        "expr": "(up{job=~\"node(-.*)?\"} == bool 0) or absent(up{job=\"node\"}) or absent(up{job=\"node-secondary\"})",
+        "for": "5m",
+        "severity": "critical",
+        "summary": "Нет метрик node_exporter уже 5 минут",
+        "description": "VictoriaMetrics не может снять метрики одного из PVE-хостов (proxmox.home.arpa:9100 или proxmox2.home.arpa:9100): упал сам экспортер, упал хост или пропала сеть. Push-метрики Proxmox идут отдельным путём — если они живы, значит проблема в экспортере."
+      },
+      {
+        "uid": "node-cpu",
+        "title": "Хост: CPU загружен",
+        "expr": "(1 - avg by(nodename) (rate(node_cpu_seconds_total{job=~\"node(-.*)?\",mode=\"idle\"}[5m]))) > 0.9",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: CPU > 90% уже 15 минут",
+        "description": "Смотри «Загрузку по ядрам» и «CPU по режимам» на дашборде node-exporter-host: system — ядро, iowait — диски, user — гости."
+      },
+      {
+        "uid": "node-load",
+        "title": "Хост: load5 выше двойного числа потоков",
+        "expr": "node_load5{job=~\"node(-.*)?\"} / on(instance, nodename) count by(instance, nodename) (node_cpu_seconds_total{job=~\"node(-.*)?\",mode=\"idle\"}) > 2",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: load5 больше 2 потоков на ядро",
+        "description": "Очередь на CPU или на диск. Если CPU при этом свободен — виноват I/O, проверь PSI и латентность дисков."
+      },
+      {
+        "uid": "node-mem",
+        "title": "Хост: память заканчивается",
+        "expr": "(1 - node_memory_MemAvailable_bytes{job=~\"node(-.*)?\"} / node_memory_MemTotal_bytes{job=~\"node(-.*)?\"}) > 0.9",
+        "for": "10m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: доступно менее 10% RAM",
+        "description": "MemAvailable учитывает кеш, поэтому 90% — это уже реальная нехватка. Первый подозреваемый на этой ноде — ZFS ARC (node_zfs_arc_size), второй — сумма maxmem запущенных гостей."
+      },
+      {
+        "uid": "node-swap",
+        "title": "Хост: ушёл в swap",
+        "expr": "(node_memory_SwapTotal_bytes{job=~\"node(-.*)?\"} - node_memory_SwapFree_bytes{job=~\"node(-.*)?\"}) / (node_memory_SwapTotal_bytes{job=~\"node(-.*)?\"} > 0) > 0.25",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: занято более 25% swap",
+        "description": "Свопящийся гипервизор тормозит все VM разом. Урезать maxmem гостей или zfs_arc_max."
+      },
+      {
+        "uid": "node-fs",
+        "title": "Хост: файловая система заполнена",
+        "expr": "100 * (1 - node_filesystem_avail_bytes{job=~\"node(-.*)?\",fstype=~\"ext4|xfs|zfs\"} / node_filesystem_size_bytes{job=~\"node(-.*)?\",fstype=~\"ext4|xfs|zfs\"}) > 85",
+        "for": "10m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: {{ $labels.mountpoint }} занят более чем на 85%",
+        "description": "У датасетов ZFS место общее на пул, поэтому /data и /data/* краснеют вместе. Обычные виновники на root: /var/log, /var/lib/vz/dump, старые ядра."
+      },
+      {
+        "uid": "node-fs-critical",
+        "title": "Хост: файловая система вот-вот кончится",
+        "expr": "100 * (1 - node_filesystem_avail_bytes{job=~\"node(-.*)?\",fstype=~\"ext4|xfs|zfs\"} / node_filesystem_size_bytes{job=~\"node(-.*)?\",fstype=~\"ext4|xfs|zfs\"}) > 95",
+        "for": "5m",
+        "severity": "critical",
+        "summary": "{{ $labels.nodename }}: {{ $labels.mountpoint }} занят более чем на 95%",
+        "description": "На забитом пуле ZFS перестаёт писать, а гости встают в D-state. Освобождать место прямо сейчас: снапшоты, дампы бэкапов, логи."
+      },
+      {
+        "uid": "node-fs-inodes",
+        "title": "Хост: заканчиваются inode",
+        "expr": "100 * (1 - node_filesystem_files_free{job=~\"node(-.*)?\",fstype=~\"ext4|xfs\"} / node_filesystem_files{job=~\"node(-.*)?\",fstype=~\"ext4|xfs\"}) > 85",
+        "for": "10m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: {{ $labels.mountpoint }} — занято более 85% inode",
+        "description": "Место есть, а файл не создать. Ищи каталог с миллионом мелких файлов: кеши, почта, сессии."
+      },
+      {
+        "uid": "node-psi-io",
+        "title": "Хост: задачи стоят на дисках",
+        "expr": "rate(node_pressure_io_stalled_seconds_total{job=~\"node(-.*)?\"}[5m]) > 0.8",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: более 80% времени все задачи стоят на дисках",
+        "description": "PSI io stalled — доля времени, когда из-за диска не может работать вообще никто. На этой ноде с HDD-пулом норма 0.3–0.5, поэтому порог поднят до 0.8: ниже он ловил бы обычный фон."
+      },
+      {
+        "uid": "node-systemd-failed",
+        "title": "Хост: есть упавшие юниты systemd",
+        "expr": "node_systemd_units{job=~\"node(-.*)?\",state=\"failed\"} > 0",
+        "for": "5m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: юнитов в состоянии failed — {{ $value }}",
+        "description": "Поимённо видно на панели «systemd: упавшие юниты поимённо», на хосте — systemctl --failed."
+      },
+      {
+        "uid": "node-oom",
+        "title": "Хост: сработал OOM killer",
+        "expr": "increase(node_vmstat_oom_kill{job=~\"node(-.*)?\"}[10m]) > 0",
+        "for": "0s",
+        "severity": "critical",
+        "summary": "{{ $labels.nodename }}: ядро убило процесс из-за нехватки памяти",
+        "description": "Смотри dmesg -T | grep -i oom: там имя жертвы. Обычно это гость с завышенным maxmem или разросшийся ARC."
+      },
+      {
+        "uid": "node-clock",
+        "title": "Хост: часы не синхронизированы",
+        "expr": "node_timex_sync_status{job=~\"node(-.*)?\"} == bool 0",
+        "for": "30m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: ядро считает время несинхронизированным",
+        "description": "Отвалился NTP или дрейф вышел за допуск. На хосте: timedatectl status, systemctl status chrony."
+      },
+      {
+        "uid": "node-conntrack",
+        "title": "Хост: таблица conntrack заполняется",
+        "expr": "node_nf_conntrack_entries{job=~\"node(-.*)?\"} / node_nf_conntrack_entries_limit{job=~\"node(-.*)?\"} > 0.8",
+        "for": "10m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: conntrack занят более чем на 80%",
+        "description": "При переполнении ядро начинает молча дропать новые соединения. Лечится nf_conntrack_max или таймаутами."
+      },
+      {
+        "uid": "node-net-errs",
+        "title": "Хост: ошибки на сетевом интерфейсе",
+        "expr": "rate(node_network_receive_errs_total{job=~\"node(-.*)?\",device!~\"lo|fw.+|tap.+|veth.+\"}[5m]) + rate(node_network_transmit_errs_total{job=~\"node(-.*)?\",device!~\"lo|fw.+|tap.+|veth.+\"}[5m]) > 1",
+        "for": "10m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: {{ $labels.device }} — более 1 ошибки в секунду",
+        "description": "Ошибки на физическом интерфейсе — это почти всегда железо: кабель, порт коммутатора, SFP."
+      },
+      {
+        "uid": "node-apt-security",
+        "title": "Хост: не установлены security-обновления",
+        "expr": "sum by(nodename) (apt_upgrades_pending{job=~\"node(-.*)?\",origin=~\".*security.*\"}) > 0",
+        "for": "24h",
+        "severity": "info",
+        "summary": "{{ $labels.nodename }}: ждут установки security-пакеты ({{ $value }} шт.)",
+        "description": "Считает textfile-коллектор apt. Ставится через apt update && apt upgrade; правило не сработает, пока пакетов нет ровно сутки. Severity info: это домашняя работа, а не инцидент — уведомление приходит раз в неделю (routes в alerts/notification-policies.json), а не каждые четыре часа, как стоявшие firing warning-алерты."
+      },
+      {
+        "uid": "node-reboot-required",
+        "title": "Хост: требуется перезагрузка",
+        "expr": "node_reboot_required{job=~\"node(-.*)?\"} > 0",
+        "for": "6h",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: обновление требует перезагрузки",
+        "description": "Обновилось ядро или libc — до перезагрузки работает старый код. Для гипервизора это плановое окно с миграцией или остановкой гостей."
+      }
+    ],
+    "node-disk": [
+      {
+        "uid": "node-smart-unhealthy",
+        "title": "Диски: smartctl считает диск больным",
+        "expr": "smartmon_device_smart_healthy{job=~\"node(-.*)?\"} == bool 0",
+        "for": "5m",
+        "severity": "critical",
+        "summary": "{{ $labels.nodename }}: {{ $labels.disk }} не проходит SMART self-assessment",
+        "description": "Диск сам сообщает, что скоро умрёт. Проверить smartctl -a, вывести из пула, заменить."
+      },
+      {
+        "uid": "node-smart-reallocated",
+        "title": "Диски: переназначенные секторы",
+        "expr": "smartmon_reallocated_sector_ct_raw_value{job=~\"node(-.*)?\"} > 0",
+        "for": "10m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: {{ $labels.disk }} — переназначено секторов: {{ $value }}",
+        "description": "Поверхность начала сыпаться. Само по себе не смертельно, но диск в списке на замену, а на пуле нужен scrub."
+      },
+      {
+        "uid": "node-smart-pending",
+        "title": "Диски: нечитаемые секторы",
+        "expr": "smartmon_current_pending_sector_raw_value{job=~\"node(-.*)?\"} > 0 or smartmon_offline_uncorrectable_raw_value{job=~\"node(-.*)?\"} > 0",
+        "for": "5m",
+        "severity": "critical",
+        "summary": "{{ $labels.nodename }}: {{ $labels.disk }} — секторы, которые не читаются",
+        "description": "Pending и offline uncorrectable означают потерянные данные на этих блоках. Запустить zpool scrub и готовить замену."
+      },
+      {
+        "uid": "node-smart-crc",
+        "title": "Диски: новые ошибки UDMA CRC",
+        "expr": "smartmon_udma_crc_error_count_raw_value{job=~\"node(-.*)?\"} - smartmon_udma_crc_error_count_raw_value{job=~\"node(-.*)?\"} offset 24h > 0",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: {{ $labels.disk }} — счётчик CRC вырос за сутки",
+        "description": "CRC — это интерфейс, а не поверхность: шлейф, бэкплейн, порт контроллера. Правило сравнивает с суткой назад, поэтому старые ошибки в счётчике его не будят."
+      },
+      {
+        "uid": "node-smart-stale",
+        "title": "Диски: данные SMART устарели",
+        "expr": "time() - smartmon_smartctl_run{job=~\"node(-.*)?\"} > 21600",
+        "for": "30m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: {{ $labels.disk }} — smartctl не запускался 6 часов",
+        "description": "Textfile-коллектор перестал обновлять файл: сломался таймер smartmon или сам smartctl. Здоровье дисков в этот момент никто не смотрит."
+      },
+      {
+        "uid": "node-textfile-error",
+        "title": "Хост: textfile-коллектор ругается",
+        "expr": "node_textfile_scrape_error{job=~\"node(-.*)?\"} > 0",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: node_exporter не смог прочитать файлы textfile-коллектора",
+        "description": "Битый .prom-файл в каталоге textfile: метрики smartmon, nvme и apt в этот момент не обновляются."
+      },
+      {
+        "uid": "node-nvme-wear",
+        "title": "NVMe: ресурс записи на исходе",
+        "expr": "nvme_percentage_used_ratio{job=~\"node(-.*)?\"} > 0.8",
+        "for": "1h",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: {{ $labels.device }} израсходовал более 80% ресурса",
+        "description": "Диск сам оценивает износ. После 100% производитель гарантий не даёт — планировать замену."
+      },
+      {
+        "uid": "node-nvme-spare",
+        "title": "NVMe: кончаются резервные блоки",
+        "expr": "nvme_available_spare_ratio{job=~\"node(-.*)?\"} < bool nvme_available_spare_threshold_ratio{job=~\"node(-.*)?\"}",
+        "for": "15m",
+        "severity": "critical",
+        "summary": "{{ $labels.nodename }}: {{ $labels.device }} — spare ниже порога производителя",
+        "description": "Резерв под замену сбойных блоков исчерпан, дальше диск уходит в read-only. Менять."
+      },
+      {
+        "uid": "node-nvme-critical",
+        "title": "NVMe: критическое предупреждение",
+        "expr": "nvme_critical_warning{job=~\"node(-.*)?\"} > 0",
+        "for": "5m",
+        "severity": "critical",
+        "summary": "{{ $labels.nodename }}: {{ $labels.device }} выставил critical warning ({{ $value }})",
+        "description": "Битовая маска из SMART/Health log: перегрев, деградация носителя, отказ резерва, read-only. Подробности — nvme smart-log."
+      },
+      {
+        "uid": "node-nvme-media-errors",
+        "title": "NVMe: новые ошибки носителя",
+        "expr": "nvme_media_errors_total{job=~\"node(-.*)?\"} - nvme_media_errors_total{job=~\"node(-.*)?\"} offset 24h > 0",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: {{ $labels.device }} — ошибки носителя выросли за сутки",
+        "description": "Диск не смог прочитать или записать блок. Одиночная ошибка бывает, растущий счётчик — нет."
+      },
+      {
+        "uid": "node-disk-latency",
+        "title": "Диски: высокая латентность записи",
+        "expr": "rate(node_disk_write_time_seconds_total{job=~\"node(-.*)?\",device=~\"sd[a-z]|nvme[0-9]n[0-9]\"}[5m]) / (rate(node_disk_writes_completed_total{job=~\"node(-.*)?\",device=~\"sd[a-z]|nvme[0-9]n[0-9]\"}[5m]) > 0) > 0.2",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: {{ $labels.device }} — запись дольше 200 мс",
+        "description": "Для HDD терпимо во время scrub или ресильвера, в остальное время — перегруженный или умирающий диск. Сверься с PSI I/O и утилизацией."
+      },
+      {
+        "uid": "node-disk-temp",
+        "title": "Диски: перегрев",
+        "expr": "smartmon_temperature_celsius_raw_value{job=~\"node(-.*)?\"} > 50",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: {{ $labels.disk }} нагрелся до {{ $value }} °C",
+        "description": "Выше 50 °C ресурс HDD падает заметно. Проверить обдув корзины и обороты вентиляторов."
+      },
+      {
+        "uid": "node-smart-park-rate",
+        "title": "Диски: головки паркуются слишком часто",
+        "expr": "(smartmon_load_cycle_count_raw_value{job=~\"node(-.*)?\"} - smartmon_load_cycle_count_raw_value{job=~\"node(-.*)?\"} offset 6h) / 6 > 25",
+        "for": "30m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: {{ $labels.disk }} паркует головки {{ $value }} раз в час",
+        "description": "Средний темп за 6 часов. Норма для здешних WD Red — 1–2 парковки в час, у enterprise RE4 около нуля. Сотни в час означают, что диск ушёл в агрессивный idle-таймер (болезнь WD Green с idle3 в 8 секунд): так паспортный ресурс в 300–600 тысяч циклов выбирается за год. Лечится idle3ctl или APM, если диск его поддерживает."
+      },
+      {
+        "uid": "node-smart-park-budget",
+        "title": "Диски: подходит к концу ресурс парковок",
+        "expr": "smartmon_load_cycle_count_raw_value{job=~\"node(-.*)?\"} > 250000",
+        "for": "1h",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: {{ $labels.disk }} — {{ $value }} парковок головок",
+        "description": "Нижняя паспортная граница у бытовых дисков — 300 тысяч циклов, у WD Red и enterprise 600 тысяч. Порог 250 тысяч — предупреждение для самых слабых; сверься с нормализованным значением smartmon_load_cycle_count_value: его диск считает сам от своего ресурса. Износ механики, не потеря данных."
+      }
+    ],
+    "node-hardware": [
+      {
+        "uid": "node-hwmon-max",
+        "title": "Железо: датчик выше порога max",
+        "expr": "node_hwmon_temp_celsius{job=~\"node(-.*)?\"} >= node_hwmon_temp_max_celsius{job=~\"node(-.*)?\"}",
+        "for": "10m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: {{ $labels.chip }}/{{ $labels.sensor }} = {{ $value }} °C, порог превышен",
+        "description": "Порог берётся у самого датчика (для ядер Xeon это 79 °C, для дисков drivetemp — 60). Проверить обдув и пыль в радиаторах."
+      },
+      {
+        "uid": "node-hwmon-crit",
+        "title": "Железо: датчик на критическом пороге",
+        "expr": "node_hwmon_temp_celsius{job=~\"node(-.*)?\"} >= node_hwmon_temp_crit_celsius{job=~\"node(-.*)?\"}",
+        "for": "2m",
+        "severity": "critical",
+        "summary": "{{ $labels.nodename }}: {{ $labels.chip }}/{{ $labels.sensor }} = {{ $value }} °C — критический порог",
+        "description": "Следующий шаг — троттлинг и аварийное выключение по железу. Разбираться немедленно."
+      },
+      {
+        "uid": "node-ipmi-fan",
+        "title": "Железо: вентилятор встал",
+        "expr": "node_ipmi_speed_rpm{job=~\"node(-.*)?\"} < bool 1000",
+        "for": "5m",
+        "severity": "critical",
+        "summary": "{{ $labels.nodename }}: {{ $labels.sensor }} крутится медленнее 1000 об/мин",
+        "description": "В корпусе Supermicro 1U штатные обороты — 6000+. Меньше тысячи значит, что вентилятор умер или его вынули."
+      },
+      {
+        "uid": "node-ipmi-status",
+        "title": "Железо: IPMI сообщает о проблеме",
+        "expr": "node_ipmi_status{job=~\"node(-.*)?\"} > 0",
+        "for": "5m",
+        "severity": "critical",
+        "summary": "{{ $labels.nodename }}: датчик {{ $labels.sensor }} не в норме",
+        "description": "Дискретные датчики шасси: питание, вскрытие корпуса, температура CPU. 0 — норма, больше — non-critical, critical или non-recoverable. Подробности в ipmitool sel list."
+      },
+      {
+        "uid": "node-ipmi-dimm-temp",
+        "title": "Железо: перегрев планок памяти",
+        "expr": "node_ipmi_temperature_celsius{job=~\"node(-.*)?\",sensor=~\".*DIMM.*\"} > 75",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: {{ $labels.sensor }} = {{ $value }} °C",
+        "description": "Горячая память начинает сыпать correctable-ошибками ECC. Штатно на этой ноде 33–45 °C."
+      },
+      {
+        "uid": "node-edac-correctable",
+        "title": "Память: новые исправимые ошибки ECC",
+        "expr": "node_edac_correctable_errors_total{job=~\"node(-.*)?\"} - node_edac_correctable_errors_total{job=~\"node(-.*)?\"} offset 24h > 0",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: контроллер {{ $labels.controller }} чинит ошибки памяти",
+        "description": "ECC исправил ошибку на лету, данные целы. Но растущий счётчик — заявка на замену планки: смотри в IPMI, какая именно."
+      },
+      {
+        "uid": "node-edac-uncorrectable",
+        "title": "Память: неисправимая ошибка ECC",
+        "expr": "node_edac_uncorrectable_errors_total{job=~\"node(-.*)?\"} > 0",
+        "for": "0s",
+        "severity": "critical",
+        "summary": "{{ $labels.nodename }}: контроллер {{ $labels.controller }} — неисправимая ошибка памяти",
+        "description": "ECC не смог починить: данные повреждены, ядро могло уронить процесс или всю ноду. Планку менять."
+      },
+      {
+        "uid": "node-ipmi-12v",
+        "title": "Железо: просадка по +12 В",
+        "expr": "abs(node_ipmi_volts{job=~\"node(-.*)?\",sensor=\"+12V\"} - 12) > 0.6",
+        "for": "10m",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: +12 В ушло на {{ $value }} В от номинала",
+        "description": "Отклонение больше 5% — блок питания или его нагрузка. Проверить второй БП и журнал IPMI."
+      },
+      {
+        "uid": "node-ipmi-vbat",
+        "title": "Железо: садится батарейка CMOS",
+        "expr": "node_ipmi_volts{job=~\"node(-.*)?\",sensor=\"VBAT\"} < bool 2.8",
+        "for": "1h",
+        "severity": "warning",
+        "summary": "{{ $labels.nodename }}: VBAT ниже 2.8 В",
+        "description": "Классика старых серверов: сядет — слетят часы и настройки BIOS при обесточивании. Батарейка CR2032."
+      }
+    ]
+  }
+}

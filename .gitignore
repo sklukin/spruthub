@@ -1,2 +1,5 @@
 docs/plans/*
 rm/*
+# Python test artifacts
+__pycache__/
+*.pyc

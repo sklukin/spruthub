@@ -1,0 +1,87 @@
+{{ define "homelab" }}
+{{- $n := len .Alerts.Firing -}}
+{{- if gt $n 1 -}}
+🔥 {{ $n }} шт. · {{ .CommonLabels.alertname }}
+{{ range .Alerts.Firing }}
+{{ template "homelab.icon" . }} {{ template "homelab.where" . }}{{ with .Annotations.summary }}
+{{ . }}{{ end }}{{ if .Values }}{{ with index .Values "A" }} · значение {{ . }}{{ end }}{{ end }}
+🔕 {{ .SilenceURL }}
+{{- end }}
+{{ with (index .Alerts.Firing 0).Annotations.description }}
+{{ . }}
+{{ end }}📋 правило: {{ (index .Alerts.Firing 0).GeneratorURL }}
+{{ end -}}
+
+{{- if eq $n 1 -}}
+{{- with index .Alerts.Firing 0 -}}
+{{ template "homelab.icon" . }} {{ template "homelab.where" . }}
+{{ .Labels.alertname }}
+{{ with .Annotations.summary }}
+{{ . }}{{ end }}
+{{- if .Values }}{{ with index .Values "A" }}
+значение: {{ . }}{{ end }}{{ end }}
+началось: {{ template "homelab.time" .StartsAt }} МСК
+{{- with .Annotations.description }}
+
+{{ . }}{{ end }}
+{{- with .SilenceURL }}
+
+🔕 заглушить: {{ . }}{{ end }}
+{{- with .GeneratorURL }}
+📋 правило: {{ . }}{{ end }}
+{{ end }}
+{{ end -}}
+
+{{- range .Alerts.Resolved }}
+{{ template "homelab.icon" . }} {{ template "homelab.where" . }}
+{{ .Labels.alertname }} — восстановлено
+{{ with .Annotations.summary }}
+было: {{ . }}{{ end }}
+длилось с {{ template "homelab.time" .StartsAt }} до {{ template "homelab.time" .EndsAt }} МСК
+{{ end -}}
+{{ end }}
+
+{{- define "homelab.icon" -}}
+{{- if eq .Status "resolved" }}✅{{ else if eq .Labels.severity "critical" }}🔴{{ else }}🟠{{ end -}}
+{{- end -}}
+
+{{- define "homelab.where" -}}
+{{- if .Labels.nodename }}{{ .Labels.nodename }}
+{{- else if .Labels.host }}{{ .Labels.host }}
+{{- else if .Labels.room }}{{ .Labels.room }}
+{{- else if .Labels.instance }}{{ .Labels.instance }}
+{{- else }}homelab{{ end -}}
+{{- with .Labels.vmid }} · VM {{ . }}{{ end -}}
+{{- with .Labels.mountpoint }} · {{ . }}{{ end -}}
+{{- with .Labels.device }} · {{ . }}{{ end -}}
+{{- with .Labels.disk }} · {{ . }}{{ end -}}
+{{- with .Labels.sensor }} · {{ . }}{{ end -}}
+{{- with .Labels.chip }} · {{ . }}{{ end -}}
+{{- with .Labels.storage }} · {{ . }}{{ end -}}
+{{- with .Labels.name }} · {{ . }}{{ end -}}
+{{- end -}}
+
+{{- define "homelab.time" -}}{{ .Local.Format "02.01 15:04" }}{{- end -}}
+
+{{/*
+  Шаблон уведомлений homelab. Живёт в репозитории homelab/grafana,
+  заливается push-alerts.py в Grafana → Alerting → Notification templates.
+
+  Порядок строк отвечает на вопросы в том порядке, в каком их задают ночью:
+  насколько плохо (иконка), где (объект), что (имя правила), сколько (значение),
+  с каких пор, что делать (описание), как заткнуть.
+
+  Формат — плоский текст: parse_mode у точки контакта выключен, потому что
+  тексты правил содержат > и <, которые ломают HTML-разметку.
+
+  homelab.where — «где именно»: первая метка, отвечающая на вопрос «на чём»,
+  плюс уточнения из vmid, mountpoint, device, disk, sensor, chip, storage, name.
+  Ссылки и время приходят готовыми: у контейнера Grafana на хосте monitoring заданы
+  GF_SERVER_ROOT_URL=http://monitoring.home.arpa:3000 и TZ=Europe/Moscow. Раньше шаблон
+  переписывал localhost через reReplaceAll и прибавлял к времени три часа константой.
+
+  Грабли: файл обязан начинаться с define, имя которого совпадает с именем
+  шаблона (homelab). Иначе Grafana заворачивает содержимое в собственный
+  define, вложенные define ломают разбор и заливка падает с HTTP 400
+  «unexpected <define> in command».
+*/}}

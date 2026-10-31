@@ -1,0 +1,2187 @@
+{
+  "uid": "e2d31da1-1c70-4012-a8ae-aff654decf0c",
+  "title": "Copper: датчики дома (VictoriaMetrics)",
+  "description": "Датчики умного дома из SprutHub: температура, влажность, CO2, качество воздуха, электричество. SprutHub шлёт их в VictoriaMetrics в формате InfluxDB, метрика sensors_value с метками type/room/service/accessory/chrType. Датчики отчитываются по изменению, а не по расписанию, поэтому обзорные плитки читают last_over_time за два часа. Управляется из репозитория homelab/grafana — правки через UI перетрутся следующим деплоем.",
+  "tags": [
+    "copper",
+    "sensors",
+    "homelab"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "15m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "DS",
+        "label": "Источник данных",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "refresh": 1,
+        "regex": ""
+      },
+      {
+        "type": "query",
+        "name": "room",
+        "label": "Комната",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS}"
+        },
+        "query": {
+          "query": "label_values(sensors_value, room)",
+          "refId": "room"
+        },
+        "definition": "label_values(sensors_value, room)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Обзор",
+      "id": 1,
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "Температура по комнатам",
+      "id": 2,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Последнее значение каждого датчика за два часа: датчики шлют по изменению, мгновенный запрос увидел бы пустоту.",
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 18
+              },
+              {
+                "color": "orange",
+                "value": 26
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by(room) (last_over_time(sensors_value{type=\"TemperatureSensor\",room=~\"$room\",room!~\"Улица|Дом|Септик\",service!~\"Температура-ESP|Внешняя-температура|Температура-наружного-воздуха|Температура-двигателя|Температура-салона|BOARD\"}[2h]))",
+          "legendFormat": "{{room}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "Влажность по комнатам",
+      "id": 3,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Норма для жилых комнат 40–60%. Выше 70 двое суток — плесень, ниже 25 зимой — сухо.",
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "humidity",
+          "custom": {},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 30
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 70
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by(room) (last_over_time(sensors_value{type=\"HumiditySensor\",room=~\"$room\",room!~\"Улица|Дом\"}[2h]))",
+          "legendFormat": "{{room}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "CO2 по комнатам",
+      "id": 4,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "До 800 ppm свежо, выше 1400 болит голова. Датчиков всего четыре: гостевая, кабинет, кухня, спальня.",
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "conppm",
+          "custom": {},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 900
+              },
+              {
+                "color": "red",
+                "value": 1400
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by(room) (last_over_time(sensors_value{type=\"CarbonDioxideSensor\",room=~\"$room\"}[2h]))",
+          "legendFormat": "{{room}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Мощность дома",
+      "id": 5,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Суммарная-Мощность со счётчика на вводе.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "custom": {},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "last_over_time(sensors_value{type=\"C_WattMeter\",service=\"Суммарная-Мощность\"}[2h])",
+          "legendFormat": "дом",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Напряжение: максимум",
+      "id": 6,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Верхняя граница ГОСТ — 253 В.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "volt",
+          "custom": {},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 253
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(last_over_time(sensors_value{type=\"C_VoltMeter\"}[2h]) > 100)",
+          "legendFormat": "max",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Напряжение: минимум",
+      "id": 7,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Нижняя граница ГОСТ — 207 В. Нули отброшены: так вольтметры показывают обрыв связи.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "volt",
+          "custom": {},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 207
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "min(last_over_time(sensors_value{type=\"C_VoltMeter\"}[2h]) > 100)",
+          "legendFormat": "min",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "На улице",
+      "id": 8,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Датчик-температуры-AVG, если он жив, иначе максимум по уличным датчикам.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(last_over_time(sensors_value{type=\"TemperatureSensor\",room=\"Улица\",service=~\"Датчик-температуры.*\"}[2h]))",
+          "legendFormat": "улица",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Котёл",
+      "id": 9,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Датчик-температуры-Котел в котельной: за месяц ходил от 17.5 до 48.8 °C.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "last_over_time(sensors_value{service=\"Датчик-температуры-Котел\"}[2h])",
+          "legendFormat": "котёл",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Датчиков отчиталось за час",
+      "id": 10,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Всего их около 220. Резкое падение означает, что встал SprutHub — то же самое ловит правило copper-feed-dead.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 150
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(count_over_time(sensors_value[1h]))",
+          "legendFormat": "датчиков",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Климат",
+      "id": 11,
+      "collapsed": true,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Температура по комнатам",
+          "id": 12,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Каждый датчик отдельно. Служебные датчики-заглушки исключены по имени.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 15
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "celsius",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by(room, service) (last_over_time(sensors_value{type=\"TemperatureSensor\",room=~\"$room\",room!~\"Улица|Дом|Септик\",service!~\"Температура-ESP|Внешняя-температура|Температура-наружного-воздуха|Температура-двигателя|Температура-салона|BOARD\"}[1h]))",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Температура: дом целиком и год назад",
+          "id": 13,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Агрегат room=\"Дом\" от SprutHub против того же периода прошлого года.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 15
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "celsius",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by(room, service) (last_over_time(sensors_value{type=\"TemperatureSensor\", room=\"Дом\"}[1h]))",
+              "legendFormat": "{{service}}",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "max by(room, service) (last_over_time(sensors_value{type=\"TemperatureSensor\", room=\"Дом\"}[1h] offset 1y))",
+              "legendFormat": "{{service}} — год назад",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Температура: средняя по жилым комнатам",
+          "id": 14,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Одна линия на весь дом плюс прошлый год: видно, теплее эта зима или холоднее.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 23
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "celsius",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "avg (last_over_time(sensors_value{type=\"TemperatureSensor\",room!~\"Котельня|Улица|Дом|Септик\",accessory!~\"Tion-Breezer-ESP\",service!~\"Температура-ESP|Внешняя-температура|Температура-наружного-воздуха|Температура-двигателя|Температура-салона|BOARD\"}[1h]))",
+              "legendFormat": "средняя",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "avg (last_over_time(sensors_value{type=\"TemperatureSensor\",room!~\"Котельня|Улица|Дом|Септик\",accessory!~\"Tion-Breezer-ESP\",service!~\"Температура-ESP|Внешняя-температура|Температура-наружного-воздуха|Температура-двигателя|Температура-салона|BOARD\"}[1h] offset 1y))",
+              "legendFormat": "средняя — год назад",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Температура на улице",
+          "id": 15,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Все уличные датчики на одной панели вместо четырёх почти одинаковых, плюс прошлый год пунктиром в легенде.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 23
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "celsius",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by(service) (last_over_time(sensors_value{type=\"TemperatureSensor\", room=\"Улица\",service!~\"Температура-двигателя|Температура-салона\"}[1h]))",
+              "legendFormat": "{{service}}",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "max by(service) (last_over_time(sensors_value{type=\"TemperatureSensor\", room=\"Улица\",service!~\"Температура-двигателя|Температура-салона\"}[1h] offset 1y))",
+              "legendFormat": "{{service}} — год назад",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Влажность по комнатам",
+          "id": 16,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Санузлы и гараж тоже здесь: 80–90% там штатно после душа, правило алертинга их не трогает.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 31
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "humidity",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by(room, service) (last_over_time(sensors_value{type=\"HumiditySensor\",room=~\"$room\"}[1h]))",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Влажность: средняя по жилым комнатам",
+          "id": 17,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Без улицы и агрегата «Дом», с прошлогодней линией.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 31
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "humidity",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "avg (last_over_time(sensors_value{type=\"HumiditySensor\", room!~\"Улица|Дом\"}[1h]))",
+              "legendFormat": "средняя",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "avg (last_over_time(sensors_value{type=\"HumiditySensor\", room!~\"Улица|Дом\"}[1h] offset 1y))",
+              "legendFormat": "средняя — год назад",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "CO2 по комнатам",
+          "id": 18,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Здесь max, а не sum: складывать концентрацию газа из разных комнат бессмысленно.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 39
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "conppm",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by(room, service) (last_over_time(sensors_value{type=\"CarbonDioxideSensor\",room=~\"$room\"}[1h]))",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "CO2: среднее и год назад",
+          "id": 19,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Средняя концентрация по всем датчикам против прошлого года.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 39
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "conppm",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "avg (last_over_time(sensors_value{type=\"CarbonDioxideSensor\"}[1h]))",
+              "legendFormat": "среднее",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "avg (last_over_time(sensors_value{type=\"CarbonDioxideSensor\"}[1h] offset 1y))",
+              "legendFormat": "среднее — год назад",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Освещённость",
+          "id": 20,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Семнадцать датчиков света, которых раньше не было на дашборде. Дают контекст к остальным графикам: видно, день или ночь, и горит ли свет в комнате.",
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 47
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "lux",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by(room, service) (last_over_time(sensors_value{type=\"LightSensor\",room=~\"$room\"}[1h]))",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      }
+    },
+    {
+      "type": "row",
+      "title": "Отопление и климатика",
+      "id": 21,
+      "collapsed": true,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Что видят климатические устройства",
+          "id": 22,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Термостаты, кондиционеры, обогреватели и бризеры отдают свою температуру отдельно от комнатных датчиков. Раньше эти двенадцать серий на дашборд не попадали вовсе. Расхождение с комнатным датчиком показывает, где стоит устройство — в потоке своего же воздуха или в комнате.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 56
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "celsius",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by(room, service) (last_over_time(sensors_value{type=~\"Thermostat|HeaterCooler\",room=~\"$room\"}[1h]))",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Увлажнители",
+          "id": 23,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Собственные датчики увлажнителей против комнатных: если увлажнитель показывает сильно суше комнаты, он меряет свой выхлоп.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 56
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "humidity",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by(room, service) (last_over_time(sensors_value{type=\"HumidifierDehumidifier\",room=~\"$room\"}[1h]))",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "max by(room) (last_over_time(sensors_value{type=\"HumiditySensor\",room=~\"Спальня|Кабинет\"}[1h]))",
+              "legendFormat": "{{room}} — комнатный датчик",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Разница между домом и улицей",
+          "id": 24,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Насколько дом теплее улицы. Чем шире зазор, тем дороже отопление; резкое схлопывание означает, что отопление встало.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 64
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "celsius",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "avg(last_over_time(sensors_value{type=\"TemperatureSensor\",room!~\"Улица|Дом|Кессон|Гараж\",service!~\"Температура-ESP|Внешняя-температура|Температура-наружного-воздуха\"}[1h])) - avg(last_over_time(sensors_value{type=\"TemperatureSensor\",room=\"Улица\",service=~\"Датчик-температуры.*\"}[1h]))",
+              "legendFormat": "дом − улица",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Скорость изменения температуры",
+          "id": 25,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Градусов в час по каждому датчику. Плюс — комната греется, минус — остывает. По скорости остывания видно теплопотери: сколько дом теряет за час, когда отопление молчит.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 64
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "celsius",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "deriv(sensors_value{type=\"TemperatureSensor\",room=~\"$room\",room!~\"Улица|Дом|Септик\",service!~\"Температура-ESP|Внешняя-температура|Температура-наружного-воздуха|Температура-двигателя|Температура-салона|BOARD\"}[1h]) * 3600",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 55
+      }
+    },
+    {
+      "type": "row",
+      "title": "Качество воздуха",
+      "id": 26,
+      "collapsed": true,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Летучие органические соединения",
+          "id": 27,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Фон в комнатах 30–360 ppb. Всплески до тысяч — уборка, краска, готовка.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 48
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "conppb",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by(room, service) (last_over_time(sensors_value{type=\"AirQualitySensor\",chrType=\"VOCDensity\",room=~\"$room\"}[1h]))",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Пыль PM2.5",
+          "id": 28,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Суточный порог ВОЗ — 35 мкг/м³. В доме обычно 1–4.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 73
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "suffix:мкг/м³",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by(room, service) (last_over_time(sensors_value{type=\"AirQualitySensor\",chrType=\"PM2_5Density\",room=~\"$room\"}[1h]))",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Динамика CO2",
+          "id": 29,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Прирост концентрации в час. Показывает не уровень, а работу вентиляции: если в спальне +300 ppm/час, воздух не успевает меняться. Отрицательные значения — комната проветривается.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 81
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "suffix: ppm/час",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "deriv(sensors_value{type=\"CarbonDioxideSensor\",room=~\"$room\"}[30m]) * 3600",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Точка росы по комнатам",
+          "id": 30,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Считается из температуры и влажности по формуле Магнуса. Это температура, при которой на поверхности выступит конденсат: если точка росы в комнате выше температуры холодной стены или окна, там будет сырость и плесень. В санузлах и гараже она штатно выше, чем в жилых комнатах.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 81
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "celsius",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "237.7 * (ln(max by(room) (last_over_time(sensors_value{type=\"HumiditySensor\",room!~\"Улица|Дом\"}[2h])) / 100) + on(room) (17.27 * max by(room) (last_over_time(sensors_value{type=\"TemperatureSensor\",room!~\"Улица|Дом|Септик\",service!~\"Температура-ESP|Внешняя-температура|Температура-наружного-воздуха|Температура-двигателя|Температура-салона|BOARD\"}[2h])) / (237.7 + max by(room) (last_over_time(sensors_value{type=\"TemperatureSensor\",room!~\"Улица|Дом|Септик\",service!~\"Температура-ESP|Внешняя-температура|Температура-наружного-воздуха|Температура-двигателя|Температура-салона|BOARD\"}[2h]))))) / (17.27 - (ln(max by(room) (last_over_time(sensors_value{type=\"HumiditySensor\",room!~\"Улица|Дом\"}[2h])) / 100) + on(room) (17.27 * max by(room) (last_over_time(sensors_value{type=\"TemperatureSensor\",room!~\"Улица|Дом|Септик\",service!~\"Температура-ESP|Внешняя-температура|Температура-наружного-воздуха|Температура-двигателя|Температура-салона|BOARD\"}[2h])) / (237.7 + max by(room) (last_over_time(sensors_value{type=\"TemperatureSensor\",room!~\"Улица|Дом|Септик\",service!~\"Температура-ESP|Внешняя-температура|Температура-наружного-воздуха|Температура-двигателя|Температура-салона|BOARD\"}[2h]))))))",
+              "legendFormat": "{{room}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 72
+      }
+    },
+    {
+      "type": "row",
+      "title": "Электричество",
+      "id": 31,
+      "collapsed": true,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Мощность по розеткам",
+          "id": 32,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Каждый ваттметр отдельно, суммарный счётчик вынесен на соседнюю панель, чтобы не давил масштабом.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 57
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "watt",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by(room, service) (last_over_time(sensors_value{type=\"C_WattMeter\",service!=\"Суммарная-Мощность\",room=~\"$room\"}[1h]))",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Суммарная мощность дома",
+          "id": 33,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Счётчик на вводе против суммы отдельных ваттметров: расхождение — это то, что не считается розетками (плита, свет, отопление).",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 57
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "watt",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "last_over_time(sensors_value{type=\"C_WattMeter\", service=\"Суммарная-Мощность\"}[1h])",
+              "legendFormat": "счётчик на вводе",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "sum(last_over_time(sensors_value{type=\"C_WattMeter\", room=\"Дом\", service!=\"Суммарная-Мощность\"}[1h]))",
+              "legendFormat": "сумма ваттметров дома",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Расход за час",
+          "id": 34,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Прирост показаний счётчика кВт·ч в часовом окне.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 65
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "kwatth",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by(room, service)(last_over_time(sensors_value{type=\"C_KiloWattHourMeter\", room=\"Дом\"}[15m])) - max by(room, service)(last_over_time(sensors_value{type=\"C_KiloWattHourMeter\", room=\"Дом\"}[15m] offset 1h))",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Расход по суткам и год назад",
+          "id": 35,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Одна точка — одни сутки, разность показаний счётчика на их границах. Сутки идут от 3:00 МСК до 3:00 МСК: суточный шаг Grafana выравнивает по UTC. Разрыв там, где в этих сутках не было данных от SprutHub.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 65
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "kwatth",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "auto",
+                "drawStyle": "line"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by(room)(last_over_time(sensors_value{type=\"C_KiloWattHourMeter\", room=\"Дом\"}[1h])) - sum by(room)(last_over_time(sensors_value{type=\"C_KiloWattHourMeter\", room=\"Дом\"}[1h] offset 1d))",
+              "legendFormat": "{{room}}",
+              "editorMode": "code",
+              "range": true,
+              "interval": "1d"
+            },
+            {
+              "refId": "B",
+              "expr": "sum by(room)(last_over_time(sensors_value{type=\"C_KiloWattHourMeter\", room=\"Дом\"}[1h] offset 365d)) - sum by(room)(last_over_time(sensors_value{type=\"C_KiloWattHourMeter\", room=\"Дом\"}[1h] offset 366d))",
+              "legendFormat": "{{room}} — год назад",
+              "editorMode": "code",
+              "range": true,
+              "interval": "1d"
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Ток по комнатам",
+          "id": 36,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 73
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "amp",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by(room, service) (last_over_time(sensors_value{type=\"C_AmpereMeter\",room=~\"$room\"}[1h]))",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Напряжение по комнатам",
+          "id": 37,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Границы ГОСТ 207 и 253 В. За месяц сеть выходила на 257 и проваливалась до 203.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 73
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "volt",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by(room, service) (last_over_time(sensors_value{type=\"C_VoltMeter\",room=~\"$room\"}[1h])) > 50",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "bargauge",
+          "title": "Топ потребителей за сутки",
+          "id": 38,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Прирост показаний счётчиков кВт·ч за сутки, восемь самых прожорливых. Отвечает на вопрос «куда уходит электричество», на который графики мощности не отвечают.",
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 81
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "kwatth",
+              "custom": {},
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "topk(8, sum by(room, service)(last_over_time(sensors_value{type=\"C_KiloWattHourMeter\"}[1h])) - sum by(room, service)(last_over_time(sensors_value{type=\"C_KiloWattHourMeter\"}[1h] offset 1d)))",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "displayMode": "gradient",
+            "orientation": "horizontal",
+            "showUnfilled": true,
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 56
+      }
+    },
+    {
+      "type": "row",
+      "title": "Состояние датчиков",
+      "id": 39,
+      "collapsed": true,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Сколько датчиков отчитывается",
+          "id": 40,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Скользящее окно в час. Норма около 220; провал означает, что встал SprutHub.",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 82
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "count(count_over_time(sensors_value[1h]))",
+              "legendFormat": "всего",
+              "editorMode": "code",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "expr": "count by(type) (count_over_time(sensors_value[1h]))",
+              "legendFormat": "{{type}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Замолчавшие датчики",
+          "id": 41,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Писали в течение прошлых суток и молчат последние три часа — та же логика, что у правила copper-sensor-silent. Пусто, когда всё в порядке.",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 82
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "count by(room, service, type) (count_over_time(sensors_value[24h] offset 3h)) unless count by(room, service, type) (count_over_time(sensors_value[3h]))",
+              "legendFormat": "{{room}} — {{service}} ({{type}})",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Датчики с мусорными значениями",
+          "id": 42,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "description": "Заглушка -327.7 у неподключённого ESP. Эти же датчики исключены по имени из остальных панелей.",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 82
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "celsius",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "last_over_time(sensors_value{type=\"TemperatureSensor\"}[1h]) <= -50",
+              "legendFormat": "{{room}} — {{service}}",
+              "editorMode": "code",
+              "range": true
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 81
+      }
+    }
+  ]
+}

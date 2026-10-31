@@ -1,0 +1,122 @@
+{
+  "folder": "Homelab",
+  "folderUid": "homelab",
+  "interval": "5m",
+  "service": "copper",
+  "groups": {
+    "copper-feed": [
+      {
+        "uid": "copper-feed-dead",
+        "title": "Copper: датчики перестали писать в базу",
+        "expr": "count(count_over_time(sensors_value[1h])) < bool 50",
+        "for": "15m",
+        "severity": "critical",
+        "summary": "За час отчиталось меньше 50 датчиков из ~220",
+        "description": "Похоже, встал SprutHub или его выгрузка в VictoriaMetrics (данные приходят по протоколу InfluxDB). Все климатические правила ниже в этот момент слепнут."
+      },
+      {
+        "uid": "copper-sensor-silent",
+        "title": "Copper: датчик замолчал",
+        "expr": "sum without(service) (label_replace(count by(room, service, type) (count_over_time(sensors_value[10d] offset 96h)) unless count by(room, service, type) (count_over_time(sensors_value[96h])), \"sensor\", \"$1\", \"service\", \"(.*)\"))",
+        "for": "30m",
+        "severity": "warning",
+        "summary": "{{ $labels.room }} / {{ $labels.sensor }} ({{ $labels.type }}) не отчитывается 4 суток",
+        "description": "SprutHub шлёт по каждому датчику heartbeat раз в час, поэтому живой датчик не молчит дольше пары часов (замер по живой базе: нормальный максимум гэпа — 1 час, редкие умирающие датчики молчали по 3–11 суток). Раньше окно было 3 часа — при heartbeat-ритме правило ловило каждый паузу между точками и генерировало треть всего шума в Telegram. Самый частый диагноз — севшая батарейка или отвалившийся Zigbee. Имя датчика приезжает в метке sensor: метка service занята маршрутизацией уведомлений."
+      },
+      {
+        "uid": "copper-sensor-garbage",
+        "title": "Copper: датчик отдаёт мусор",
+        "expr": "sum without(service) (label_replace(last_over_time(sensors_value{type=\"TemperatureSensor\",service!=\"Внешняя-температура\"}[24h]), \"sensor\", \"$1\", \"service\", \"(.*)\")) <= bool -50",
+        "for": "30m",
+        "severity": "warning",
+        "summary": "{{ $labels.room }} / {{ $labels.sensor }}: температура ниже -50 °C",
+        "description": "-327.7 — классическая заглушка ESP, означающая «датчик не подключён». Два навсегда мёртвых датчика Внешняя-температура (Кабинет и Спальня) исключены по имени: это ждущий ремонта датчик, а не инцидент, и два месяца стоявшего firing как раз и приучили не читать алерты. Окно 24 часа: мусорная точка держит серию firing сутки, правило не мигает на редких точках."
+      }
+    ],
+    "copper-climate": [
+      {
+        "uid": "copper-co2",
+        "title": "Copper: высокий CO2",
+        "expr": "sum without(service) (label_replace(last_over_time(sensors_value{type=\"CarbonDioxideSensor\"}[1h]), \"sensor\", \"$1\", \"service\", \"(.*)\")) > 1400",
+        "for": "30m",
+        "severity": "warning",
+        "summary": "{{ $labels.room }}: CO2 {{ $value }} ppm",
+        "description": "Выше 1400 ppm начинает болеть голова и падает концентрация. Норма для этих комнат 400–700, максимум за месяц был 1772. Лечится открытым окном или бризером."
+      },
+      {
+        "uid": "copper-humidity-high",
+        "title": "Copper: сырость в комнате",
+        "expr": "sum without(service) (label_replace(last_over_time(sensors_value{type=\"HumiditySensor\",room!~\"Улица|Кессон|Гараж|Котельня|Подсобка|Склад|Ванная|Туалет|Дом\"}[2h]), \"sensor\", \"$1\", \"service\", \"(.*)\")) > 71",
+        "for": "4h",
+        "severity": "warning",
+        "summary": "{{ $labels.room }} / {{ $labels.sensor }}: влажность {{ $value }}%",
+        "description": "Выше 70% двое суток подряд — это плесень по углам и в стенах. Санузлы, гараж и улица из правила исключены: там 80–90% штатно после душа или дождя. Порог 71 и ожидание 4 часа — с запасом от границы: датчик в прихожей живёт на 70.x% и на ровной границе 70/2ч мигал по два раза в день."
+      },
+      {
+        "uid": "copper-room-cold",
+        "title": "Copper: в комнате холодно",
+        "expr": "16.5 - sum without(service) (label_replace(last_over_time(sensors_value{type=\"TemperatureSensor\",room!~\"Улица|Кессон|Гараж|Котельня|Подсобка|Склад|Ванная|Туалет|Дом\",service!~\"Температура-ESP|Внешняя-температура|Температура-наружного-воздуха|Температура-двигателя\"}[2h]), \"sensor\", \"$1\", \"service\", \"(.*)\")) > 0",
+        "for": "1h",
+        "severity": "warning",
+        "summary": "{{ $labels.room }} / {{ $labels.sensor }}: на {{ $value }} °C ниже 16",
+        "description": "Штатно в комнатах 21–25 °C. Провал ниже 16 значит, что встало отопление или открыто окно. Значение правила — насколько градусов холоднее порога; срабатывание от 15.5 °C (запас полградуса от границы): септик осенью стоит ровно на 16.0 и на ровной границе мигал по трижды в день."
+      },
+      {
+        "uid": "copper-freeze",
+        "title": "Copper: риск разморозки",
+        "expr": "3 - sum without(service) (label_replace(last_over_time(sensors_value{type=\"TemperatureSensor\",room=~\"Кессон|Гараж|Котельня|Подсобка|Склад\",service!~\"Температура-ESP|Внешняя-температура|Температура-наружного-воздуха|Температура-двигателя\"}[2h]), \"sensor\", \"$1\", \"service\", \"(.*)\")) > 0",
+        "for": "30m",
+        "severity": "critical",
+        "summary": "{{ $labels.room }} / {{ $labels.sensor }}: ниже 3 °C",
+        "description": "В кессоне и котельне проходит вода. Ниже нуля лопаются трубы, а это несколько дней ремонта — поэтому правило критическое и с коротким ожиданием."
+      },
+      {
+        "uid": "copper-voc",
+        "title": "Copper: грязный воздух (ЛОС)",
+        "expr": "sum without(service) (label_replace(last_over_time(sensors_value{type=\"AirQualitySensor\",chrType=\"VOCDensity\"}[2h]), \"sensor\", \"$1\", \"service\", \"(.*)\")) > 2000",
+        "for": "30m",
+        "severity": "warning",
+        "summary": "{{ $labels.room }}: летучие органические соединения {{ $value }} ppb",
+        "description": "Штатный фон в этих комнатах 30–360 ppb, максимум за месяц доходил до 8500 — обычно это уборка, краска или готовка. Выше 2000 полчаса подряд стоит проветрить."
+      },
+      {
+        "uid": "copper-pm25",
+        "title": "Copper: пыль PM2.5",
+        "expr": "sum without(service) (label_replace(last_over_time(sensors_value{type=\"AirQualitySensor\",chrType=\"PM2_5Density\"}[2h]), \"sensor\", \"$1\", \"service\", \"(.*)\")) > 35",
+        "for": "30m",
+        "severity": "warning",
+        "summary": "{{ $labels.room }}: PM2.5 {{ $value }} мкг/м³",
+        "description": "Суточный порог ВОЗ. Сейчас в доме 1–4 мкг/м³, так что срабатывание означает реальный источник: жарка, свечи, дым с улицы."
+      }
+    ],
+    "copper-power": [
+      {
+        "uid": "copper-voltage-high",
+        "title": "Copper: перенапряжение в сети",
+        "expr": "sum without(service) (label_replace(avg_over_time(sensors_value{type=\"C_VoltMeter\"}[1h]), \"sensor\", \"$1\", \"service\", \"(.*)\")) > 253",
+        "for": "30m",
+        "severity": "critical",
+        "summary": "{{ $labels.room }} / {{ $labels.sensor }}: {{ $value }} В",
+        "description": "253 В — верхняя граница ГОСТ (230 В +10%). Правило смотрит на среднее за час, а не на отдельные точки: линия на Кухне в среднем держит 243 В и примерно 2% времени за месяц — устойчиво выше 253, при этом секундные пики до 257 В будить не должны (раньше на last_over_time правило мигало по три раза в сутки). Долгое перенапряжение убивает блоки питания и светодиодные лампы; если повторяется — нужно реле напряжения на вводе."
+      },
+      {
+        "uid": "copper-voltage-low",
+        "title": "Copper: просадка напряжения",
+        "expr": "207 - (sum without(service) (label_replace(avg_over_time(sensors_value{type=\"C_VoltMeter\"}[1h]), \"sensor\", \"$1\", \"service\", \"(.*)\")) > 100) > 0",
+        "for": "30m",
+        "severity": "warning",
+        "summary": "{{ $labels.room }} / {{ $labels.sensor }}: на {{ $value }} В ниже 207",
+        "description": "Нижняя граница ГОСТ. Минимум за месяц был 203 В. Среднее за час отсекает короткие пусковые просадки (насос в Подсобке раньше давал по эпизоду в два дня). Отсечка по значению выше 100 В отбрасывает нули — так вольтметры показывают собственный обрыв связи, а не реальную сеть."
+      },
+      {
+        "uid": "copper-power-house",
+        "title": "Copper: дом ест слишком много",
+        "expr": "sum without(service) (label_replace(last_over_time(sensors_value{type=\"C_WattMeter\",service=\"Суммарная-Мощность\"}[1h]), \"sensor\", \"$1\", \"service\", \"(.*)\")) > 12000",
+        "for": "5m",
+        "severity": "warning",
+        "summary": "Суммарная мощность дома {{ $value }} Вт",
+        "description": "Максимум за последний месяц — 11 кВт, так что 12 кВт означает необычную нагрузку. Порог стоит подогнать под номинал вводного автомата: если ввод 15 кВт, разумнее поставить 13000."
+      }
+    ]
+  }
+}

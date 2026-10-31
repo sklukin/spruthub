@@ -1,0 +1,193 @@
+{
+  "folder": "Homelab",
+  "folderUid": "homelab",
+  "interval": "1m",
+  "groups": {
+    "proxmox-node": [
+      {
+        "uid": "pve-node-absent",
+        "title": "Proxmox: нода не отдаёт метрики",
+        "expr": "absent(cpustat_cpu{object=\"nodes\"})",
+        "for": "5m",
+        "severity": "critical",
+        "summary": "Нет метрик от Proxmox уже 5 минут",
+        "description": "pvestatd не шлёт данные в VictoriaMetrics: нода упала, встал pvestatd или сломалась сеть до monitoring.home.arpa:8428."
+      },
+      {
+        "uid": "pve-node-cpu",
+        "title": "Proxmox: CPU ноды загружен",
+        "expr": "cpustat_cpu{object=\"nodes\"} > 0.9",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.host }}: CPU > 90% уже 15 минут",
+        "description": "Смотри, какой гость ест CPU: секция «Гости» дашборда proxmox-vm-influx."
+      },
+      {
+        "uid": "pve-node-load",
+        "title": "Proxmox: load average выше 2x числа ядер",
+        "expr": "cpustat_avg5{object=\"nodes\"} > 2 * cpustat_cpus{object=\"nodes\"}",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.host }}: load5 выше двойного числа потоков",
+        "description": "Очередь на CPU или на диск. Если CPU при этом не занят — проверь iowait и дисковую латентность гостей."
+      },
+      {
+        "uid": "pve-node-mem",
+        "title": "Proxmox: память ноды заканчивается",
+        "expr": "memory_memused{object=\"nodes\"} / memory_memtotal{object=\"nodes\"} > 0.9",
+        "for": "10m",
+        "severity": "warning",
+        "summary": "{{ $labels.host }}: занято > 90% RAM",
+        "description": "Проверь сумму maxmem запущенных гостей и размер ZFS ARC (memory_arcsize) — ARC часто и есть едок."
+      },
+      {
+        "uid": "pve-node-swap",
+        "title": "Proxmox: нода ушла в swap",
+        "expr": "memory_swapused{object=\"nodes\"} / (memory_swaptotal{object=\"nodes\"} > 0) > 0.25",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.host }}: занято > 25% swap",
+        "description": "Свопящийся гипервизор тормозит все VM сразу. Урезать maxmem гостей или arcmax."
+      },
+      {
+        "uid": "pve-node-rootfs",
+        "title": "Proxmox: root FS заполнен",
+        "expr": "blockstat_per{object=\"nodes\"} > 85",
+        "for": "10m",
+        "severity": "warning",
+        "summary": "{{ $labels.host }}: root FS занят более чем на 85%",
+        "description": "Обычные виновники: /var/log, /var/lib/vz, старые ядра, дампы в /var/lib/vz/dump."
+      },
+      {
+        "uid": "pve-node-rootfs-crit",
+        "title": "Proxmox: root FS почти полон",
+        "expr": "blockstat_per{object=\"nodes\"} > 95",
+        "for": "5m",
+        "severity": "critical",
+        "summary": "{{ $labels.host }}: root FS занят более чем на 95%",
+        "description": "На нуле места Proxmox перестанет писать конфиги и логи. Чистить прямо сейчас."
+      },
+      {
+        "uid": "pve-node-rootfs-predict",
+        "title": "Proxmox: root FS кончится в течение суток",
+        "expr": "(predict_linear(blockstat_bavail{object=\"nodes\"}[6h], 86400) < bool 0) > 0",
+        "for": "30m",
+        "severity": "warning",
+        "summary": "{{ $labels.host }}: по тренду за 6 часов место на root FS кончится за сутки",
+        "description": "Ранний сигнал — есть время разобраться без гонки."
+      },
+      {
+        "uid": "pve-node-inodes",
+        "title": "Proxmox: заканчиваются inode на root FS",
+        "expr": "blockstat_fper{object=\"nodes\"} > 85",
+        "for": "10m",
+        "severity": "warning",
+        "summary": "{{ $labels.host }}: занято > 85% inode",
+        "description": "Место может быть, а файлы создаваться перестанут. Ищи каталог с миллионом мелких файлов."
+      }
+    ],
+    "proxmox-storage": [
+      {
+        "uid": "pve-storage-full",
+        "title": "Proxmox: хранилище заполняется",
+        "expr": "100 * (1 - system_avail{object=\"storages\"} / system_total{object=\"storages\"}) > 85",
+        "for": "10m",
+        "severity": "warning",
+        "summary": "{{ $labels.host }}: занято более 85%",
+        "description": "Хранилище {{ $labels.host }} ({{ $labels.type }}). Для zfspool заполнение выше 80% ещё и роняет производительность."
+      },
+      {
+        "uid": "pve-storage-full-crit",
+        "title": "Proxmox: хранилище почти полное",
+        "expr": "100 * (1 - system_avail{object=\"storages\"} / system_total{object=\"storages\"}) > 95",
+        "for": "5m",
+        "severity": "critical",
+        "summary": "{{ $labels.host }}: занято более 95%",
+        "description": "Бэкапы и снапшоты вот-вот начнут падать, гости на этом хранилище — вставать в read-only."
+      },
+      {
+        "uid": "pve-storage-inactive",
+        "title": "Proxmox: хранилище неактивно",
+        "expr": "(system_active{object=\"storages\"} == bool 0) > 0",
+        "for": "5m",
+        "severity": "critical",
+        "summary": "{{ $labels.host }}: хранилище не активно",
+        "description": "Отвалился zfspool/NFS/каталог. Диски гостей на нём недоступны."
+      },
+      {
+        "uid": "pve-storage-predict",
+        "title": "Proxmox: хранилище кончится за 3 дня",
+        "expr": "(predict_linear(system_avail{object=\"storages\"}[12h], 259200) < bool 0) > 0",
+        "for": "1h",
+        "severity": "warning",
+        "summary": "{{ $labels.host }}: по тренду за 12 часов место кончится за трое суток",
+        "description": "Чаще всего это разросшиеся бэкапы или снапшоты, которые забыли удалить."
+      }
+    ],
+    "proxmox-guests": [
+      {
+        "uid": "pve-guest-cpu",
+        "title": "Proxmox: гость упёрся в CPU",
+        "expr": "system_cpu{object=~\"qemu|lxc\"} > 0.95",
+        "for": "30m",
+        "severity": "warning",
+        "summary": "{{ $labels.host }} (vmid {{ $labels.vmid }}): CPU > 95% полчаса",
+        "description": "Либо процессу мало vCPU, либо он завис в цикле. Порог намеренно долгий — разовая компиляция будить не должна."
+      },
+      {
+        "uid": "pve-guest-mem",
+        "title": "Proxmox: гостю не хватает памяти",
+        "expr": "system_mem{object=~\"qemu|lxc\"} / system_maxmem{object=~\"qemu|lxc\"} > 0.92",
+        "for": "1h",
+        "severity": "warning",
+        "summary": "{{ $labels.host }} (vmid {{ $labels.vmid }}): занято > 92% выделенной памяти",
+        "description": "Следующая остановка — OOM killer внутри гостя. Поднять maxmem или разобраться с утечкой. Ожидание час: кеш гостя штатно подбирается к 92% и опускается — на 15 минутах правило мигало по два раза в сутки на VM 106/107."
+      },
+      {
+        "uid": "pve-guest-disk",
+        "title": "Proxmox: диск гостя заполнен",
+        "expr": "(system_disk{object=~\"qemu|lxc\"} > 0) / system_maxdisk{object=~\"qemu|lxc\"} > 0.9",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.host }} (vmid {{ $labels.vmid }}): диск занят более чем на 90%",
+        "description": "Для QEMU метрика приходит только с qemu-guest-agent; где агента нет, правило молчит по построению."
+      },
+      {
+        "uid": "pve-guest-block-errors",
+        "title": "Proxmox: ошибки блочного устройства гостя",
+        "expr": "sum by (host, vmid, instance) (rate(blockstat_failed_rd_operations{object=\"qemu\"}[10m]) + rate(blockstat_failed_wr_operations{object=\"qemu\"}[10m]) + rate(blockstat_failed_flush_operations{object=\"qemu\"}[10m])) > 0",
+        "for": "5m",
+        "severity": "critical",
+        "summary": "{{ $labels.host }}: устройство {{ $labels.instance }} возвращает ошибки",
+        "description": "Отказ операций чтения/записи/flush. Смотри dmesg на ноде и здоровье пула, на котором лежит диск."
+      },
+      {
+        "uid": "pve-guest-psi-io",
+        "title": "Proxmox: гость стоит на дисковых ожиданиях",
+        "expr": "system_pressureiosome{object=~\"qemu|lxc\"} > 20",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.host }} (vmid {{ $labels.vmid }}): PSI io some > 20%",
+        "description": "Пятая часть времени гость ждёт диск. Проверь латентность в секции «Блочные устройства гостей»."
+      },
+      {
+        "uid": "pve-guest-balloon-swap",
+        "title": "Proxmox: VM свопится внутри себя",
+        "expr": "rate(ballooninfo_mem_swapped_out{object=\"qemu\"}[10m]) > 1000000",
+        "for": "30m",
+        "severity": "warning",
+        "summary": "{{ $labels.host }} (vmid {{ $labels.vmid }}): гостевая ОС свопит больше 1 МБ/с",
+        "description": "Balloon отобрал память или её изначально мало. Порог 1 МБ/с: за 10 минут это 600 МБ вытесненной памяти, полчаса подряд — точно не кеш. Кратковременные своп-бёрсты (агентские VM кладут сотни мегабайт за минуты — до 20 МБ/с на agent-6) — это хроническая нехватка памяти, лечится maxmem, а не уведомлением каждые полчаса. Проверь ballooninfo_actual против maxmem."
+      },
+      {
+        "uid": "pve-guest-swap",
+        "title": "Proxmox: контейнер свопится",
+        "expr": "system_swap{object=\"lxc\"} / (system_maxswap{object=\"lxc\"} > 0) > 0.5",
+        "for": "15m",
+        "severity": "warning",
+        "summary": "{{ $labels.host }} (vmid {{ $labels.vmid }}): занято > 50% swap контейнера",
+        "description": "LXC-контейнеру мало памяти — он вытесняется в swap ноды и тормозит соседей."
+      }
+    ]
+  }
+}

@@ -1,0 +1,49 @@
+name: deploy-grafana
+
+on:
+  push:
+    branches: [main]
+    paths: ['grafana/**', '.forgejo/workflows/grafana.yml']
+  pull_request:
+    paths: ['grafana/**', '.forgejo/workflows/grafana.yml']
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v4
+      - name: Validate JSON
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for path in Path('grafana').rglob('*.json'):
+              json.loads(path.read_text())
+              print(path)
+          PY
+      - name: Test Grafana API error handling
+        run: python3 -m unittest discover -s grafana/tests -v
+      - name: Check shell syntax
+        run: sh -n grafana/push.sh
+
+  deploy:
+    needs: check
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      GRAFANA_URL: ${{ vars.GRAFANA_URL || 'http://monitoring.home.arpa:3000' }}
+      GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
+      DS_UID: ${{ vars.DS_UID || 'ca323c89-304d-4630-90ab-16c715c6e304' }}
+      DS_INFLUX_UID: ${{ vars.DS_INFLUX_UID || 'c700f9b8-c600-4a9f-9de7-01f77ae2c52c' }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+    steps:
+      - uses: https://github.com/actions/checkout@v4
+      - name: Check required secrets
+        run: |
+          test -n "$GRAFANA_TOKEN" || { echo 'Missing GRAFANA_TOKEN secret'; exit 1; }
+          test -n "$TELEGRAM_BOT_TOKEN" || { echo 'Missing TELEGRAM_BOT_TOKEN secret'; exit 1; }
+      - name: Deploy dashboards
+        run: ./grafana/push.sh
+      - name: Deploy alerts and notifications
+        run: ./grafana/push-alerts.py
