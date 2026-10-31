@@ -2,6 +2,24 @@
 
 Коллекция сценариев для SprutHub — автоматизация умного дома.
 
+## CI
+
+Тесты запускаются на Node.js 20 при push и pull request:
+
+- GitHub Actions: [`.github/workflows/tests.yml`](.github/workflows/tests.yml).
+- Forgejo Actions: [`.forgejo/workflows/tests.yml`](.forgejo/workflows/tests.yml).
+
+Для Forgejo нужен доступный runner с меткой `ubuntu-latest`, Node.js для
+запуска actions и доступом к GitHub и nodejs.org. Полные URL actions явно
+задают источник независимо от настройки `DEFAULT_ACTIONS_URL` сервера.
+
+Локальная проверка:
+
+```bash
+node logic/test-runner.js
+node --test tests/*.test.js
+```
+
 ## Сценарии
 
 ### AWTRIX Temperature Display
