@@ -35,7 +35,7 @@ class AlertApiTest(unittest.TestCase):
                 # Load the CLI in an empty workspace: no deployments run on import.
                 with tempfile.TemporaryDirectory() as directory, contextlib.chdir(directory), patch.dict(os.environ, env), patch('sys.exit'), patch('time.sleep'):
                     api = runpy.run_path(str(SCRIPT))['api']
-                    result = api('POST', '/api/ruler/grafana/api/v1/rules/homelab', {'name': 'node-disk'})
+                    result = api('POST', '/api/ruler/grafana/api/v1/rules/homelab', {'name': 'copper-feed'})
                 return result, received
             finally:
                 server.shutdown()
@@ -48,8 +48,7 @@ class AlertApiTest(unittest.TestCase):
             calls.append((method, path, body))
             return 200, '{}'
 
-        env = {'GRAFANA_URL': 'http://grafana.test', 'GRAFANA_TOKEN': 'test',
-               'TELEGRAM_BOT_TOKEN': 'test'}
+        env = {'GRAFANA_URL': 'http://grafana.test', 'GRAFANA_TOKEN': 'test'}
         with tempfile.TemporaryDirectory() as directory, contextlib.chdir(directory), patch.dict(os.environ, env):
             main = runpy.run_path(str(SCRIPT))['main']
             with patch.dict(main.__globals__, {'api': api}):
@@ -60,16 +59,18 @@ class AlertApiTest(unittest.TestCase):
                     for rule in rules}
         actual = {rule['grafana_alert']['uid'] for group in groups for rule in group['rules']}
         self.assertEqual(actual, expected)
-        self.assertTrue(any('/provisioning/templates/' in path for _, path, _ in calls))
-        self.assertTrue(any('/provisioning/contact-points/' in path for _, path, _ in calls))
-        self.assertTrue(any(path.endswith('/provisioning/policies') for _, path, _ in calls))
+        self.assertEqual({group['name'] for group in groups},
+                         {'copper-feed', 'copper-climate', 'copper-power', 'spruthub-metrics'})
+        self.assertTrue(all(rule['labels']['service'] in {'copper', 'spruthub'}
+                            for group in groups for rule in group['rules']))
+        self.assertFalse(any('/provisioning/' in path for _, path, _ in calls))
 
     def test_retries_locked_rule_group_with_same_payload(self):
         result, bodies = self.request([(500, 'database is locked'), (202, 'accepted')])
         self.assertEqual(result, (202, 'accepted'))
         self.assertEqual(len(bodies), 2)
         self.assertEqual(bodies[0], bodies[1])
-        self.assertEqual(json.loads(bodies[0]), {'name': 'node-disk'})
+        self.assertEqual(json.loads(bodies[0]), {'name': 'copper-feed'})
 
     def test_persistent_lock_is_reported_after_bounded_attempts(self):
         result, bodies = self.request([(500, 'database is locked')])

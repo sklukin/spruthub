@@ -36,14 +36,12 @@ jobs:
       GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
       DS_UID: ${{ vars.DS_UID || 'ca323c89-304d-4630-90ab-16c715c6e304' }}
       DS_INFLUX_UID: ${{ vars.DS_INFLUX_UID || 'c700f9b8-c600-4a9f-9de7-01f77ae2c52c' }}
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
     steps:
       - uses: https://github.com/actions/checkout@v4
       - name: Check required secrets
         run: |
           test -n "$GRAFANA_TOKEN" || { echo 'Missing GRAFANA_TOKEN secret'; exit 1; }
-          test -n "$TELEGRAM_BOT_TOKEN" || { echo 'Missing TELEGRAM_BOT_TOKEN secret'; exit 1; }
       - name: Deploy dashboards
         run: ./grafana/push.sh
-      - name: Deploy alerts and notifications
+      - name: Deploy smart home alerts
         run: ./grafana/push-alerts.py

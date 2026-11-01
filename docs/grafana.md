@@ -1,7 +1,7 @@
 # Grafana: дашборды, алерты и доставка
 
 Каталог `grafana/` содержит конфигурацию Grafana и скрипты доставки.
-Импортирован весь набор из `homelab/grafana`, commit
+Дашборды Copper и правила умного дома импортированы из `homelab/grafana`, commit
 `15ebebc02020f1f8ae8a307f2b442e2e7965d94c`. UID дашбордов и правил сохранены:
 деплой обновляет существующие объекты. Прежние файлы `copper-influxdb.json`
 и `copper-prometheus.json` заменены актуальными версиями с теми же UID.
@@ -12,22 +12,19 @@
 |---|---|
 | `copper-influx.json` | Датчики дома, InfluxDB |
 | `copper-sensors.json` | Датчики дома, VictoriaMetrics |
-| `node.json` | Хосты node_exporter |
-| `proxmox.json` | Proxmox VE |
-| `ups.json` | ИБП, NUT |
 
-В `grafana/alerts/` перенесены `copper.json` (12 правил), `node.json`
-(39 правил), `proxmox.json` (20 правил), `contact-points.json`,
-`notification-policies.json` и шаблон `templates/homelab.tmpl`.
-Существующее правило `spruthub.json` сохранено — всего 72 правила.
+В `grafana/alerts/` находятся `copper.json` (12 правил умного дома) и
+`spruthub.json` (1 правило доступности метрик хаба) — всего 13 правил.
 
-Scrape-конфигурация остаётся в инфраструктурном репозитории.
+Мониторинг хостов, Proxmox и ИБП, scrape-конфигурация и общие настройки
+уведомлений управляются инфраструктурным репозиторием `homelab/proxmox`.
+Этот репозиторий доставляет только дашборды и группы правил умного дома.
 
 ## Forgejo Actions
 
 [Workflow](../.forgejo/workflows/grafana.yml) проверяет JSON, shell-синтаксис
 и тесты Grafana API. На push в `main`, затрагивающий `grafana/**` или сам
-workflow, затем публикует дашборды, алерты и настройки уведомлений.
+workflow, затем публикует дашборды и алерты умного дома.
 Ручной запуск доступен через `workflow_dispatch` на `main`.
 Pull request запускает только проверки.
 
@@ -35,11 +32,10 @@ Pull request запускает только проверки.
 GitHub Actions продолжает проверять JavaScript: облачный runner не имеет
 доступа к локальной Grafana.
 
-В Actions secrets репозитория `homelab/spruthub` нужны:
-
-- `GRAFANA_TOKEN` — service account token Grafana с ролью Admin
-  (для обновления дерева notification policies).
-- `TELEGRAM_BOT_TOKEN` — токен бота для существующей точки контакта.
+В Actions secrets репозитория `homelab/spruthub` нужен `GRAFANA_TOKEN` —
+service account token Grafana с правами на запись дашбордов и алертов.
+Уведомления используют уже настроенную маршрутизацию Grafana по меткам
+`service=copper` и `service=spruthub`.
 
 Actions variables:
 
@@ -63,7 +59,7 @@ python3 -m unittest discover -s grafana/tests -v
 sh -n grafana/push.sh
 ```
 
-Перед доставкой задать `GRAFANA_URL`, `GRAFANA_TOKEN` и `TELEGRAM_BOT_TOKEN`
+Перед доставкой задать `GRAFANA_URL` и `GRAFANA_TOKEN`
 в окружении, затем из любого каталога:
 
 ```sh
@@ -76,8 +72,7 @@ sh -n grafana/push.sh
 новые имена имеют приоритет. `FOLDER_UID` задаёт папку дашбордов.
 
 Дашборды публикуются с `overwrite: true`; datasource-переменные получают UID
-из окружения. Скрипт алертов обновляет шаблоны, дерево политик, точки контакта
-и группы правил. PUT политик заменяет всё дерево, POST группы — всю группу.
+из окружения. Скрипт алертов обновляет группы правил умного дома. POST группы заменяет всю группу.
 Полностью удалённые группы автоматически не удаляются.
 
 Условие правил: выражение вернуло значение больше нуля. Для отсутствующих

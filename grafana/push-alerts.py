@@ -39,12 +39,12 @@ def api(method, path, body=None, extra_headers=None):
             time.sleep(2 ** (attempt + 1))
 
 
-def rule(r, service="proxmox"):
+def rule(r, service="spruthub"):
     """Компактное правило из файла -> формат Grafana.
 
     service попадает в метку правила: по ней Notification policies разводят
     уведомления разных сервисов. Значение берётся из поля "service" файла,
-    дефолт оставлен proxmox ради alerts/proxmox.json, где поля нет.
+    По умолчанию используется service=spruthub.
     """
     return {
         "for": r.get("for", "5m"),
@@ -75,85 +75,17 @@ def rule(r, service="proxmox"):
     }
 
 
-def templates():
-    """Шаблоны уведомлений: alerts/templates/*.tmpl -> Grafana.
-
-    Имя шаблона в Grafana = имя файла без расширения. Точка контакта ссылается
-    на блок внутри файла: {{ template "homelab.message" . }}.
-    """
-    ok = True
-    for f in sorted(glob.glob(str(BASE_DIR / "alerts/templates/*.tmpl"))):
-        name = os.path.basename(f)[: -len(".tmpl")]
-        code, body = api("PUT", f"/api/v1/provisioning/templates/{name}",
-                         {"name": name, "template": Path(f).read_text()},
-                         {"X-Disable-Provenance": "true"})
-        print(f"  шаблон {name}: HTTP {code}" + (f" {body[:300]}" if code >= 300 else ""))
-        ok &= code < 300
-    return ok
-
-
-def contact_points(d):
-    """Секреты приезжают из окружения, в репозитории их нет."""
-    ok = True
-    for cp in d["contactPoints"]:
-        env = cp.pop("secretEnv", {})
-        missing = [e for e in env.values() if not os.environ.get(e)]
-        if missing:
-            # Раньше это был тихий пропуск, и точка контакта неделю жила без правок
-            # из репозитория, пока никто не читал лог. Теперь падаем.
-            print(f"  {cp['name']}: НЕТ ПЕРЕМЕННЫХ {missing} — точка контакта не обновлена")
-            ok = False
-            continue
-        cp["settings"].update({k: os.environ[e] for k, e in env.items()})
-        # X-Disable-Provenance: иначе Grafana пометит точку как provisioned и запретит правки в UI
-        hdr = {"X-Disable-Provenance": "true"}
-        code, body = api("PUT", f"/api/v1/provisioning/contact-points/{cp['uid']}", cp, hdr)
-        if code == 404:
-            code, body = api("POST", "/api/v1/provisioning/contact-points", cp, hdr)
-        print(f"  {cp['name']}: HTTP {code}" + (f" {body[:300]}" if code >= 300 else ""))
-        ok &= code < 300
-    return ok
-
-def policies():
-    """Маршрутизация уведомлений: alerts/notification-policies.json -> Grafana.
-
-    PUT заменяет всё дерево политик целиком: источник истины — файл.
-    Формат — корневой объект с вложенными routes (не «policies», это формат
-    YAML-провижининга), warning наследует корень: repeat 24 часа.
-    """
-    d = json.loads((BASE_DIR / "alerts/notification-policies.json").read_text())
-    d["apiVersion"] = 1
-    code, body = api("PUT", "/api/v1/provisioning/policies", d,
-                     {"X-Disable-Provenance": "true"})
-    print(f"  дерево политик: HTTP {code}" + (f" {body[:300]}" if code >= 300 else ""))
-    if code == 403:
-        print("  403: API политик требует роль Admin у service account токена")
-    return code < 300
-
-
 def main():
     fail = False
-    if glob.glob(str(BASE_DIR / "alerts/templates/*.tmpl")):
-        print("шаблоны уведомлений:")
-        fail |= not templates()
-    if (BASE_DIR / "alerts/notification-policies.json").exists():
-        print("политики уведомлений:")
-        fail |= not policies()
     for f in sorted(glob.glob(str(BASE_DIR / "alerts/*.json"))):
-        if Path(f).name == "notification-policies.json":  # уже залит выше
-            continue
         d = json.loads(Path(f).read_text())
-        if "contactPoints" in d:
-            print(f"точки контакта из {f}:")
-            fail |= not contact_points(d)
-            continue
-        folder_uid = d.get("folderUid", "homelab")
+        folder_uid = d.get("folderUid", "spruthub")
         code, body = api("POST", "/api/folders", {"uid": folder_uid, "title": d.get("folder", folder_uid)})
         print(f"папка {folder_uid}: {'создана' if code in (200, 201) else 'уже есть'}")
         for group, rules in d["groups"].items():
             code, body = api("POST", f"/api/ruler/grafana/api/v1/rules/{folder_uid}",
                              {"name": group, "interval": d.get("interval", "1m"),
-                              "rules": [rule(r, d.get("service", "proxmox")) for r in rules]})
+                              "rules": [rule(r, d.get("service", "spruthub")) for r in rules]})
             print(f"  {group}: HTTP {code}, правил {len(rules)}" + (f" {body[:300]}" if code >= 300 else ""))
             fail |= code >= 300
     return 1 if fail else 0
